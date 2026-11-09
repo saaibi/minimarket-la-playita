@@ -17,4 +17,4 @@ p = Path('apps/web/android/app/build.gradle')
 s = p.read_text().replace('versionName "1.0"', 'versionName "0.1.0-debug"')
 p.write_text(s)
 PY
-apps/web/android/gradlew -p apps/web/android assembleDebug --no-daemon --console=plain
+apps/web/android/gradlew -p apps/web/android assembleDebug --no-daemon --no-watch-fs --console=plain

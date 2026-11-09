@@ -67,7 +67,7 @@ Registrar modelo/OS/versiones, build/commit, entorno API, evidencia de cada caso
 
 SDK y cachés aislados en `.runtime/`: `ANDROID_HOME=.runtime/android-sdk`, `ANDROID_USER_HOME=.runtime/android-user`, `GRADLE_USER_HOME=.runtime/gradle` (usar rutas absolutas). El SDK Manager inicialmente ocultaba un error de escritura en `~/.android/cache` como fallo de descarga: redirigir ANDROID_USER_HOME resuelve ese acceso sin modificar el SDK del usuario ni desactivar TLS. Las licencias oficiales fueron aceptadas expresamente por el propietario.
 
-Paquetes requeridos: `platforms;android-36`, `build-tools;36.0.0`, `platform-tools`; JDK 21, wrapper Gradle 8.14.3 del proyecto Capacitor. Para reinstalar paquetes, ejecutar sdkmanager con esas variables y `--sdk_root`, desde origen oficial Google. No aceptar licencias nuevas por automatismo sin autorización aplicable.
+Paquetes requeridos: `platforms;android-36`, `build-tools;36.0.0`, `platform-tools` (AGP también instala Build Tools 35.0.0 por su versión predeterminada); JDK 21, wrapper Gradle 8.14.3 del proyecto Capacitor. Para reinstalar paquetes, ejecutar sdkmanager con esas variables y `--sdk_root`, desde origen oficial Google. No aceptar licencias nuevas por automatismo sin autorización aplicable.
 
 Con dependencias instaladas: `sh scripts/android-debug.sh`. El código Android se genera localmente y no se incluye en Git; los plugins SQLite y Secure Storage son dependencias directas de apps/web para que Capacitor detecte ambos. APK de salida: `apps/web/android/app/build/outputs/apk/debug/app-debug.apk`; nunca subir binarios o claves a Git público.
 
