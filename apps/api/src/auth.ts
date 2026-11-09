@@ -569,6 +569,7 @@ export async function bootstrapAdmin(
   pool: Pool,
   emailAddress: string,
   pass: string,
+  options: { onlyIfMissing?: boolean } = {},
 ) {
   const input = z
       .object({ email, password })
@@ -577,15 +578,23 @@ export async function bootstrapAdmin(
   try {
     await db.query("BEGIN");
     await db.query("SELECT pg_advisory_xact_lock(77332003)");
-    if ((await db.query("SELECT 1 FROM app_users WHERE role='admin'")).rowCount)
+    if (
+      (await db.query("SELECT 1 FROM app_users WHERE role='admin'")).rowCount
+    ) {
+      if (options.onlyIfMissing) {
+        await db.query("COMMIT");
+        return false;
+      }
       throw Error(
         "Primer administrador ya provisionado; usar gestión autorizada",
       );
+    }
     await db.query(
       "INSERT INTO app_users(id,email,password_hash,role) VALUES($1,$2,$3,'admin')",
       [randomUUID(), input.email, await hashPassword(input.password)],
     );
     await db.query("COMMIT");
+    return true;
   } catch (e) {
     await db.query("ROLLBACK");
     throw e;

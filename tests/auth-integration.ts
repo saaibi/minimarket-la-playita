@@ -46,6 +46,20 @@ test(
       await assert.rejects(
         bootstrapAdmin(server.pool, "another@example.invalid", pass),
       );
+      assert.equal(
+        await bootstrapAdmin(server.pool, "another@example.invalid", pass, {
+          onlyIfMissing: true,
+        }),
+        false,
+      );
+      assert.equal(
+        (
+          await server.pool.query(
+            "SELECT count(*)::int AS count FROM app_users WHERE role='admin'",
+          )
+        ).rows[0].count,
+        1,
+      );
       await server.app.listen(0, "127.0.0.1");
       const base =
         "http://127.0.0.1:" + server.app.getHttpServer().address().port;

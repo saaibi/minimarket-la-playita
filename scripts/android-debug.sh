@@ -13,8 +13,14 @@ npm run cap:sync -w @playita/web -- android
 # Standard generated debug signing only. No release/distribution keystore.
 python3 - <<'PY'
 from pathlib import Path
+import os, re
+version = os.environ.get("PLAYITA_ANDROID_VERSION_NAME", "0.1.0-debug")
+code = os.environ.get("PLAYITA_ANDROID_VERSION_CODE", "1")
+if not re.fullmatch(r"[0-9A-Za-z.\-]+", version) or not code.isdigit() or int(code) < 1:
+    raise SystemExit("Invalid Android version")
 p = Path('apps/web/android/app/build.gradle')
-s = p.read_text().replace('versionName "1.0"', 'versionName "0.1.0-debug"')
+s = re.sub(r'versionName "[^"\n]+"', f'versionName "{version}"', p.read_text())
+s = re.sub(r"versionCode \d+", f"versionCode {code}", s)
 p.write_text(s)
 PY
 apps/web/android/gradlew -p apps/web/android assembleDebug --no-daemon --no-watch-fs --console=plain
