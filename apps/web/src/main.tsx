@@ -10,7 +10,13 @@ import {
   Synchronizer,
   type OutboxRow,
 } from "@playita/mobile";
-import { auth, useSession, native, base } from "./session.js";
+import {
+  auth,
+  useSession,
+  native,
+  base,
+  backendConfigured,
+} from "./session.js";
 import { Login, Protected } from "./login.js";
 import { StaffUsers } from "./staff.js";
 import "./style.css";
@@ -458,11 +464,31 @@ function ProductCard({
 function Root() {
   const [ready, setReady] = useState(false);
   useEffect(() => {
+    if (!backendConfigured) return;
     void auth
       .restore()
       .catch(() => {})
       .finally(() => setReady(true));
   }, []);
+  if (!backendConfigured)
+    return (
+      <main>
+        <article>
+          <h1>Minimarket La Playita</h1>
+          <p>Versión de prueba Android · 0.1.0</p>
+          <h2>API de pruebas no configurada</h2>
+          <p>
+            La aplicación está instalada. Para iniciar sesión, consultar
+            inventario y enviar pedidos necesita una API HTTPS disponible.
+          </p>
+          <p>
+            Esta compilación no incluye datos de demostración ni confirma
+            pedidos sin conexión. El acceso estará disponible en una nueva
+            compilación con la API configurada.
+          </p>
+        </article>
+      </main>
+    );
   if (!ready)
     return (
       <main>

@@ -1,8 +1,13 @@
+import { nativeApiUrl } from "./api-endpoint.js";
 import { useSyncExternalStore } from "react";
 import { Capacitor } from "@capacitor/core";
 import { SessionClient, nativeVault } from "@playita/mobile";
 export const native = Capacitor.isNativePlatform();
-export const base = import.meta.env?.VITE_API_URL || "http://127.0.0.1:4300";
+const configuredApi = import.meta.env?.VITE_API_URL || "";
+export const base = native
+  ? nativeApiUrl(configuredApi)
+  : configuredApi || "http://127.0.0.1:4300";
+export const backendConfigured = !native || !!base;
 let logoutPending = false;
 export const auth = new SessionClient({
   base,
