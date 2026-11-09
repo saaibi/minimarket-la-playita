@@ -8,23 +8,28 @@
   ],
   "scripts": {
     "build": "npm run build -w @playita/shared && npm run build -w @playita/mobile && npm run build -w @playita/api && npm run build -w @playita/web",
-    "test": "tsx --tsconfig tsconfig.json --test tests/*.test.ts",
-    "test:integration": "npm run build -w @playita/shared && npm run build -w @playita/api && tsx --tsconfig tsconfig.json --test tests/integration.ts",
+    "test": "node --import tsx --test tests/*.test.ts tests/*.test.tsx",
+    "test:integration": "npm run build -w @playita/shared && npm run build -w @playita/api && node --import tsx --test tests/integration.ts tests/auth-integration.ts",
     "dev:api": "npm run dev -w @playita/api",
     "dev:web": "npm run dev -w @playita/web",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "dev:credentials": "tsx scripts/dev-credentials.ts",
-    "typecheck:tests": "tsc -p tsconfig.json"
+    "db:migrate": "node --import tsx scripts/migrate.ts",
+    "typecheck:tests": "tsc -p tsconfig.json",
+    "admin:bootstrap": "node --import tsx scripts/bootstrap-admin.ts",
+    "mobile:check": "node --import tsx scripts/check-mobile-env.ts"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.3",
+    "@types/express": "^5.0.6",
+    "@types/jsdom": "^30.0.0",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.15.0",
+    "jsdom": "^31.0.0",
     "prettier": "3.9.10",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3"
   },
   "dependencies": {
-    "jose": "^6.1.0",
+    "cookie": "2.0.2",
     "pg": "^8.16.3",
     "zod": "^4.1.0"
   },

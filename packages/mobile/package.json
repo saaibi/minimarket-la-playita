@@ -9,8 +9,9 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@playita/shared": "0.1.0",
+    "@aparajita/capacitor-secure-storage": "8.0.1",
+    "@capacitor-community/sqlite": "8.1.1",
     "@capacitor/core": "^8.0.0",
-    "@capacitor-community/sqlite": "8.1.1"
+    "@playita/shared": "0.1.0"
   }
 }

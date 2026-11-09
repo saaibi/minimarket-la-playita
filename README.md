@@ -2,24 +2,23 @@
 
 Base nueva, separada del prototipo ejecutable. React + TypeScript + Vite, Capacitor 8, NestJS/Node, PostgreSQL y Socket.IO. SQLite comunitario únicamente en Android/iOS. No se desplegó ni se generaron apps firmadas.
 
-## Estado verificado en este entorno
+## Estado e incremento de acceso
 
-- Build de los cuatro workspaces aprobado.
-- 7 pruebas aprobadas: SQLite real mediante `node:sqlite` (archivo durable, reapertura, leases, reintentos, conflictos y aislamiento), dominio y JWT. El transporte de algunas pruebas es un doble explícito; no prueba el servidor PostgreSQL.
-- La integración PostgreSQL 16 + HTTP Nest + SQLite real + Socket.IO **pasó en GitHub Actions**; [consultar CI](https://github.com/saaibi/minimarket-la-playita/actions/workflows/ci.yml). Localmente se omitió por ausencia de servidor PostgreSQL ejecutable en este sandbox. PostgreSQL 14 está instalado; `initdb` falla con `shmget: Operation not permitted`. Docker no está activo. No se reemplazó PostgreSQL por SQLite ni por una emulación.
-- Plugin Capacitor SQLite typechecked contra su API publicada; **no ejecutado en Android/iPhone**. No se hizo revisión visual de navegador.
-- Frontend local: http://127.0.0.1:5173/ (muestra la base; inventario/pedidos necesitan API + PostgreSQL real).
-- El prototipo anterior permanece intacto en http://127.0.0.1:4173/; sus archivos y localStorage no se importan ni modifican.
+Ahora incluye acceso de invitado y login de personal, sesiones opacas con rotación/revocación, cookies HttpOnly + CSRF web, vault nativo, rutas protegidas y gestión de personal solo admin. Se retiró el generador/login JWT de desarrollo. Google/Apple están visibles pero **no conectados**; WhatsApp queda como adaptador futuro opcional sin envíos reales. Ver [autenticación y límites](docs/authentication.md).
+
+Build y pruebas locales de SQLite, contraseñas, cliente de sesión y DOM React ejecutados. La integración contra PostgreSQL real corre en [CI](https://github.com/saaibi/minimarket-la-playita/actions/workflows/ci.yml); consultar el commit actual. PostgreSQL local sigue bloqueado por `shmget: Operation not permitted` del sandbox, sin sustitución por SQLite. Plugins nativos aún no probados en dispositivo/simulador. No hubo revisión visual de navegador ni despliegue de servicio.
+
+Frontend local http://127.0.0.1:5173/ requiere API + PostgreSQL para emitir sesiones reales. El prototipo ficticio separado sigue en http://127.0.0.1:4173/ y no se incluye en el repo público.
 
 ## Estructura
 
 ```text
 apps/web        React/Vite + configuración Capacitor Android/iOS
-apps/api        NestJS, autorización JWT, consultas y transacciones PostgreSQL
+apps/api        NestJS, sesiones y autorización, consultas y transacciones PostgreSQL
 packages/shared Contrato Zod y tipos/reglas de unidades y precios
 packages/mobile Adaptador SQLite nativo, outbox durable y sincronizador
 scripts         Migraciones, contrato OpenAPI y credenciales locales
- tests          SQLite real/JWT/dominio; integración PostgreSQL real opcional
+ tests          SQLite real/sesión/dominio; integración PostgreSQL real opcional
 ```
 
 ## Ejecutar
@@ -30,7 +29,9 @@ Node 24+ (este entorno: 26.5), npm y PostgreSQL 14+ accesible. No hace falta un 
 npm ci
 cp .env.example .env
 # Editar DATABASE_URL localmente, con la base/usuario de desarrollo reales.
-npm run dev:credentials
+npm run db:migrate
+# Definir PLAYITA_ADMIN_EMAIL y PLAYITA_ADMIN_PASSWORD solo localmente.
+npm run admin:bootstrap
 npm run build
 npm run db:migrate
 npm run dev:api
@@ -42,7 +43,7 @@ En otra terminal, desde la misma carpeta:
 npm run dev:web
 ```
 
-La API escucha solo `127.0.0.1:4300`; Vite solo `127.0.0.1:5173`. `.runtime/dev-tokens.json` contiene los JWT locales de admin, seller y buyer (8 h). Copiar uno al campo de sesión del frontend. No introducir credenciales en el chat ni versionar ese archivo. El script conserva el secreto existente o genera uno local. Esto implementa validación criptográfica y roles **de desarrollo**, no alta/login/recuperación de cuentas de producción. No hay selector capaz de cambiar los permisos del servidor.
+La API escucha solo `127.0.0.1:4300`; Vite solo `127.0.0.1:5173`. El primer admin se provisiona con variables de entorno locales y contraseña propia; no existe cuenta fija. Desde su UI se crean otros administradores y vendedores. Compradores pueden continuar como invitados, con identidad independiente emitida por el servidor. Credenciales, hashes, cookies y refresh no se imprimen ni versionan.
 
 ```sh
 npm test
@@ -55,8 +56,8 @@ Usar una base de prueba con permisos para crear un esquema temporal. La integrac
 ## Flujo y garantías implementadas
 
 1. Móvil guarda un `OrderDraft` y su UUID de idempotencia en una única fila SQLite `pending_sync`. No hay confirmación, pago ni reserva global mientras falta red.
-2. El sincronizador reclama la fila con lease/token. Las interrupciones se recuperan tras 60 s. Red/5xx/429 reintentan con backoff y misma clave; 400/401/403/404/409/422 quedan en conflicto visible y no se eliminan.
-3. API valida JWT, rol, body estricto, presentación y precio esperado. Bloquea productos en orden determinista dentro de la transacción, suma consumo base de todas las presentaciones, verifica disponibilidad y reserva.
+2. El sincronizador reclama la fila con lease/token. Las interrupciones se recuperan tras 60 s. Red/5xx/429 reintentan con backoff y misma clave; 401/403 pausan en pending_sync para reautenticar la misma cuenta, sin cambiar clave. 400/404/409/422 quedan en conflicto visible y no se eliminan.
+3. API valida sesión vigente, rol de servidor y body estricto, presentación y precio esperado. Bloquea productos en orden determinista dentro de la transacción, suma consumo base de todas las presentaciones, verifica disponibilidad y reserva.
 4. Clave única por identidad, hash canónico y bloqueo transaccional evitan duplicar la creación al repetir la misma solicitud. Reusar clave con otro body da `IDEMPOTENCY_MISMATCH`. Conflictos se conservan para esa clave: corregir requiere revisión explícita y clave nueva.
 5. SQLite confirma el ack guardando respuesta y estado `synced`. Si muere después del commit servidor, la misma clave permite recuperar la respuesta sin una segunda reserva.
 6. Revisión conserva el original y vincula nueva fila `pending_sync`. Nunca se cambian precios silenciosamente ni se borra un conflicto. Interfaz de revisión JSON es temporal y técnica para este primer incremento.
@@ -78,12 +79,16 @@ npm run cap:sync -w @playita/web
 
 Las plataformas generadas se excluyen en este primer incremento; aún no se corrieron sus builds/simuladores. La UI nueva es una pantalla vertical técnica, no una migración completa de la interfaz aprobada. Android/iOS requieren toolchains y una API de desarrollo alcanzable con HTTPS. El valor localhost no accede al equipo host desde un teléfono; la API ligada a loopback tampoco está expuesta a LAN. No se habilitó exposición de red ni cleartext nativo automáticamente.
 
-SQLite local está sin cifrar en este incremento, token solo en memoria; cierre/borrado de app, respaldo cifrado, secure storage, política de retención y protección de datos requieren el siguiente trabajo antes de usar datos reales. Cola y caché están separadas por identidad. Caducidad de token se resuelve como conflicto de autorización, sin reenviar bajo otra cuenta.
+SQLite local está sin cifrar en este incremento, access solo en memoria y refresh en vault nativo; cierre/borrado de app, respaldo cifrado, secure storage, política de retención y protección de datos requieren el siguiente trabajo antes de usar datos reales. Cola y caché están separadas por identidad. Caducidad de token se resuelve como conflicto de autorización, sin reenviar bajo otra cuenta.
 
 Fuentes verificadas: [plugin 8.1.1 y peer](https://github.com/capacitor-community/sqlite/blob/v8.1.1/package.json), [conexión](https://github.com/capacitor-community/sqlite/blob/v8.1.1/docs/APIConnection.md), [DB API](https://github.com/capacitor-community/sqlite/blob/v8.1.1/docs/APIDBConnection.md), [plugins oficiales y comunitarios](https://capacitorjs.com/docs/plugins).
 
 ## Contrato y alcance siguiente
 
-[OpenAPI](docs/openapi.json) se genera desde Zod con `npx tsx scripts/generate-contract.ts`. Documenta JWT, idempotencia, errores, cantidades y recuperación. Postman CLI no está instalado aquí; no se creó cuenta/workspace ni se publicó documentación.
+[OpenAPI](docs/openapi.json) se genera desde Zod con `npx tsx scripts/generate-contract.ts`. Documenta sesiones, idempotencia, errores, cantidades y recuperación. Postman CLI no está instalado aquí; no se creó cuenta/workspace ni se publicó documentación.
 
-Ver [arquitectura y migración progresiva](docs/architecture.md). Este incremento no implementa aún el POS real completo, CRUD administrativo de productos/presentaciones, login productivo, todos los módulos de notificaciones/horarios ni pagos Nequi reales. Tampoco promete ventas físicas offline con varias cajas: la decisión acordada es **pedidos móviles offline**. La política de POS offline/multi-caja sigue pendiente, pues una cola no garantiza evitar sobreventa física sin red.
+Ver [arquitectura y migración progresiva](docs/architecture.md). Este incremento no implementa aún el POS real completo, CRUD administrativo de productos/presentaciones, recuperación de cuentas, Google/Apple operativos y todos los módulos de notificaciones/horarios ni pagos Nequi reales. Tampoco promete ventas físicas offline con varias cajas: la decisión acordada es **pedidos móviles offline**. La política de POS offline/multi-caja sigue pendiente, pues una cola no garantiza evitar sobreventa física sin red.
+
+## Pruebas Android/iPhone
+
+[Ruta APK firmado/TestFlight y matriz de pruebas](docs/mobile-testing.md). No se generaron claves, APK, IPA ni subidas a tiendas; requiere entorno HTTPS alcanzable y firma/cuentas del propietario.

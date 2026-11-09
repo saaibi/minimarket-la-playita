@@ -9,14 +9,15 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
-    "@playita/shared": "0.1.0",
     "@nestjs/common": "^11.1.0",
     "@nestjs/core": "^11.1.0",
     "@nestjs/platform-express": "^11.1.0",
+    "@playita/shared": "0.1.0",
+    "cookie": "2.0.2",
+    "express": "^5.2.1",
+    "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
-    "socket.io": "^4.8.1",
-    "pg": "^8.16.3",
-    "jose": "^6.1.0"
+    "socket.io": "^4.8.1"
   }
 }

@@ -199,7 +199,16 @@ export class Synchronizer {
           );
           if (reply.status >= 200 && reply.status < 300)
             await this.outbox.settle(row, "synced", reply.body, null);
-          else if ([400, 401, 403, 404, 409, 422].includes(reply.status))
+          else if ([401, 403].includes(reply.status)) {
+            await this.outbox.settle(
+              row,
+              "pending_sync",
+              reply.body,
+              "Sesión requerida: reautenticar la misma cuenta; clave conservada",
+              this.clock() + 30000,
+            );
+            break;
+          } else if ([400, 404, 409, 422].includes(reply.status))
             await this.outbox.settle(
               row,
               "conflict",

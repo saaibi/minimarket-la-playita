@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Pool } from "pg";
-import { SignJWT } from "jose";
+import { bootstrapAdmin } from "../apps/api/src/auth.js";
 import { createApp } from "../apps/api/dist/app.js";
 import { migrate } from "../scripts/migrate.js";
 import { NodeSqliteDriver } from "./sqlite-driver.js";
@@ -26,29 +26,56 @@ test(
       url = new URL(databaseUrl!);
     await admin.query(`CREATE SCHEMA ${schema}`);
     url.searchParams.set("options", "-c search_path=" + schema);
-    const secret = "test-only-secret-not-for-deployment-000001";
+    const password = "test-only-" + crypto.randomUUID();
     let server: Awaited<ReturnType<typeof createApp>> | undefined;
     try {
       await migrate(url.toString());
-      server = await createApp({ databaseUrl: url.toString(), secret });
+      server = await createApp({ databaseUrl: url.toString() });
+      await bootstrapAdmin(server.pool, "admin@example.invalid", password);
       await server.app.listen(0, "127.0.0.1");
       const address = server.app.getHttpServer().address(),
         base = "http://127.0.0.1:" + address.port;
-      const token = await new SignJWT({ role: "buyer" })
-        .setProtectedHeader({ alg: "HS256" })
-        .setSubject("buyer-a")
-        .setIssuer("playita-local")
-        .setAudience("playita-api")
-        .setExpirationTime("10m")
-        .sign(new TextEncoder().encode(secret));
-      const seller = await new SignJWT({ role: "seller" })
-        .setProtectedHeader({ alg: "HS256" })
-        .setSubject("seller-a")
-        .setIssuer("playita-local")
-        .setAudience("playita-api")
-        .setExpirationTime("10m")
-        .sign(new TextEncoder().encode(secret));
+      const nativeHeaders = {
+        "Content-Type": "application/json",
+        "X-Playita-Client": "native",
+      };
+      const login = await (
+        await fetch(base + "/auth/login", {
+          method: "POST",
+          headers: nativeHeaders,
+          body: JSON.stringify({ email: "admin@example.invalid", password }),
+        })
+      ).json();
+      await fetch(base + "/auth/users", {
+        method: "POST",
+        headers: {
+          ...nativeHeaders,
+          Authorization: "Bearer " + login.accessToken,
+        },
+        body: JSON.stringify({
+          email: "seller@example.invalid",
+          password,
+          role: "seller",
+        }),
+      });
+      const sellerLogin = await (
+        await fetch(base + "/auth/login", {
+          method: "POST",
+          headers: nativeHeaders,
+          body: JSON.stringify({ email: "seller@example.invalid", password }),
+        })
+      ).json();
+      const buyer = await (
+        await fetch(base + "/auth/guest", {
+          method: "POST",
+          headers: nativeHeaders,
+          body: "{}",
+        })
+      ).json();
+      const token = buyer.accessToken,
+        seller = sellerLogin.accessToken;
       const headers = {
+        ...nativeHeaders,
         Authorization: "Bearer " + token,
         "Content-Type": "application/json",
       };
@@ -69,17 +96,20 @@ test(
         ],
       };
       const db = new NodeSqliteDriver(":memory:"),
-        box = new Outbox(db, "buyer-a");
+        box = new Outbox(db, buyer.actor.id);
       await box.init();
       const key = await box.enqueue(draft, crypto.randomUUID(), 0);
       assert.equal((await box.list())[0]!.status, "pending_sync");
-      const socket = io(base, { auth: { token }, transports: ["websocket"] });
+      const socket = io(base, {
+        auth: { accessToken: token },
+        transports: ["websocket"],
+      });
       await new Promise<void>((resolve, reject) => {
         socket.once("connect", () => resolve());
         socket.once("connect_error", reject);
       });
       const staffSocket = io(base, {
-        auth: { token: seller },
+        auth: { accessToken: seller },
         transports: ["websocket"],
       });
       await new Promise<void>((resolve, reject) => {
@@ -140,17 +170,21 @@ test(
       });
       assert.equal(priceConflict.status, 409);
       assert.equal((await priceConflict.json()).code, "PRICE_CHANGED");
-      const otherToken = await new SignJWT({ role: "buyer" })
-        .setProtectedHeader({ alg: "HS256" })
-        .setSubject("buyer-other")
-        .setIssuer("playita-local")
-        .setAudience("playita-api")
-        .setExpirationTime("10m")
-        .sign(new TextEncoder().encode(secret));
+      const other = await (
+        await fetch(base + "/auth/guest", {
+          method: "POST",
+          headers: nativeHeaders,
+          body: "{}",
+        })
+      ).json();
+      const otherToken = other.accessToken;
       assert.equal(
         (
           await fetch(base + `/orders/${response.id}`, {
-            headers: { Authorization: "Bearer " + otherToken },
+            headers: {
+              ...nativeHeaders,
+              Authorization: "Bearer " + otherToken,
+            },
           })
         ).status,
         404,
@@ -165,6 +199,7 @@ test(
         const r = await fetch(base + `/orders/${response.id}/actions`, {
           method: "POST",
           headers: {
+            ...nativeHeaders,
             Authorization: "Bearer " + seller,
             "Content-Type": "application/json",
             "Idempotency-Key": crypto.randomUUID(),

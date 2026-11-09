@@ -17,7 +17,9 @@ import { Server } from "socket.io";
 import { orderDraftSchema, actionSchema, type Actor } from "@playita/shared";
 import { z } from "zod";
 import { Store } from "./store.js";
-import { authenticate } from "./auth.js";
+import { AuthService, AuthError } from "./auth.js";
+import { type VerificationProvider } from "./verification.js";
+import { json } from "express";
 const STORE = "STORE";
 type Request = { actor: Actor; headers: Record<string, string | undefined> };
 function key(req: Request) {
@@ -100,11 +102,10 @@ class ApiController {
 }
 export async function createApp(config: {
   databaseUrl: string;
-  secret: string;
+  production?: boolean;
+  verificationProvider?: VerificationProvider;
   origins?: string[];
 }) {
-  if (config.secret.length < 32)
-    throw Error("JWT secret must be at least 32 characters");
   const pool = new Pool({ connectionString: config.databaseUrl, max: 10 });
   try {
     await pool.query("SELECT 1");
@@ -136,41 +137,97 @@ export async function createApp(config: {
     "http://localhost",
     "https://localhost",
   ];
-  app.enableCors({ origin: origins });
+  if (
+    config.production &&
+    (!config.origins?.length ||
+      config.origins.some(
+        (o) =>
+          !o.startsWith("https://") &&
+          !["capacitor://localhost", "http://localhost"].includes(o),
+      ))
+  )
+    throw Error("Production requires explicit HTTPS CORS allowlist");
+  app.enableCors({ origin: origins, credentials: true });
+  app.use(json({ limit: "64kb" }));
+  const auth = new AuthService(
+    pool,
+    origins,
+    !!config.production,
+    config.verificationProvider,
+    (family) => io?.in("session:" + family).disconnectSockets(true),
+  );
+  await auth.init();
   app.use(async (req: any, res: any, next: () => void) => {
+    if (req.method === "OPTIONS") return next();
     if (req.path === "/health") return next();
+    if (req.path.startsWith("/auth/")) return auth.handle(req, res);
     try {
-      req.actor = await authenticate(req.headers.authorization, config.secret);
+      const session = await auth.protect(req);
+      req.actor = session.actor;
       next();
-    } catch {
+    } catch (e) {
       return res
-        .status(401)
-        .json({ code: "AUTH_REQUIRED", message: "Token válido requerido" });
+        .status(e instanceof AuthError ? e.status : 401)
+        .json({ code: e instanceof AuthError ? e.code : "AUTH_REQUIRED" });
     }
   });
-  io = new Server(app.getHttpServer(), { cors: { origin: origins } });
+  io = new Server(app.getHttpServer(), {
+    cors: { origin: origins, credentials: true },
+  });
   io.use(async (socket, next) => {
     try {
-      socket.data.actor = await authenticate(
-        "Bearer " + String(socket.handshake.auth.token || ""),
-        config.secret,
-      );
+      if (
+        socket.handshake.headers.origin &&
+        !origins.includes(socket.handshake.headers.origin)
+      )
+        throw Error("ORIGIN_REJECTED");
+      const nativeToken = socket.handshake.auth.accessToken;
+      const req = {
+        headers: nativeToken
+          ? {
+              "x-playita-client": "native",
+              authorization: "Bearer " + String(nativeToken),
+            }
+          : socket.handshake.headers,
+        method: "GET",
+      };
+      socket.data.session = await auth.identity(req);
+      socket.data.authRequest = req;
       next();
     } catch {
       next(Error("AUTH_REQUIRED"));
     }
   });
   io.on("connection", (socket) => {
-    const actor = socket.data.actor as Actor;
+    const session = socket.data.session,
+      actor = session.actor as Actor;
     socket.join("catalog");
     socket.join("owner:" + actor.id);
+    socket.join("session:" + session.family);
     if (actor.role !== "buyer") socket.join("staff");
+    const expiry = setTimeout(
+      () => socket.disconnect(true),
+      Math.max(0, session.expires - Date.now()),
+    );
+    const check = setInterval(() => {
+      void auth
+        .identity(socket.data.authRequest)
+        .then((current) => {
+          if (current.actor.role !== actor.role) socket.disconnect(true);
+        })
+        .catch(() => socket.disconnect(true));
+    }, 30000);
+    socket.on("disconnect", () => {
+      clearTimeout(expiry);
+      clearInterval(check);
+    });
   });
   await app.init();
   return {
     app,
     pool,
     store,
+    auth,
     io,
     close: async () => {
       io?.disconnectSockets(true);

@@ -1,145 +1,145 @@
+import React from "react";
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Capacitor } from "@capacitor/core";
 import { io } from "socket.io-client";
+import { BrowserRouter, Routes, Route, Navigate, Link } from "react-router-dom";
 import { grams, type Product, type OrderDraft } from "@playita/shared";
 import {
   openNativeOutbox,
   Outbox,
   Synchronizer,
-  httpTransport,
   type OutboxRow,
 } from "@playita/mobile";
+import { auth, useSession, native, base } from "./session.js";
+import { Login, Protected } from "./login.js";
+import { StaffUsers } from "./staff.js";
 import "./style.css";
-const apiUrl = import.meta.env.VITE_API_URL || "http://127.0.0.1:4300",
-  native = Capacitor.isNativePlatform();
-type Session = { token: string; id: string; role: string };
 function App() {
-  const [token, setToken] = useState(""),
-    [session, setSession] = useState<Session | null>(null),
+  const session = useSession()!,
     [products, setProducts] = useState<Product[]>([]),
     [cart, setCart] = useState<OrderDraft["lines"]>([]),
     [rows, setRows] = useState<OutboxRow[]>([]),
     [orders, setOrders] = useState<unknown[]>([]),
-    [message, setMessage] = useState(
-      "Conecta una sesión local para consultar inventario.",
-    ),
+    [message, setMessage] = useState("Consultando tienda…"),
     [client, setClient] = useState(""),
     [revision, setRevision] = useState<{ key: string; text: string } | null>(
       null,
     );
   const box = useRef<Outbox | null>(null),
-    sync = useRef<Synchronizer | null>(null);
+    worker = useRef<Synchronizer | null>(null);
   async function request(path: string, init: RequestInit = {}) {
-    if (!session) throw Error("Sesión requerida");
-    const response = await fetch(apiUrl + path, {
-      ...init,
-      headers: {
-        Authorization: "Bearer " + session.token,
-        "Content-Type": "application/json",
-        ...init.headers,
-      },
-      signal: AbortSignal.timeout(10000),
-    });
-    const data = await response.json();
-    if (!response.ok) throw Error(JSON.stringify(data));
+    const response = await auth.request(path, init, session.actor.id),
+      data = await response.json();
+    if (!response.ok) throw Error(data.code || "Solicitud rechazada");
     return data;
   }
   useEffect(() => {
-    if (!session) return;
-    let active = true;
-    let ownBox: Outbox | null = null;
-    let ownSync: Synchronizer | null = null;
-    let timer: ReturnType<typeof setInterval> | undefined;
+    let active = true,
+      ownBox: Outbox | null = null,
+      ownWorker: Synchronizer | null = null;
+    const socket = io(base, { withCredentials: true, autoConnect: false });
     const update = async () => {
       if (ownBox && active) setRows(await ownBox.list());
     };
     const refresh = async () => {
       try {
-        const catalog = (await request("/inventory")) as Product[];
+        const list = (await request("/inventory")) as Product[];
         if (active) {
-          setProducts(catalog);
-          setMessage("Catálogo consultado al servidor.");
+          setProducts(list);
           setOrders((await request("/orders")) as unknown[]);
+          setMessage(
+            "Inventario consultado. Reserva y pago se validan en servidor.",
+          );
+          await ownBox?.saveCatalog(list);
         }
-        if (active) await ownBox?.saveCatalog(catalog);
-      } catch (e) {
+      } catch {
         const cached = await ownBox?.catalog();
         if (active) {
-          if (cached) setProducts(cached.data as Product[]);
+          if (cached)
+            setProducts(
+              (cached.data as Product[]).map((p) =>
+                session.actor.role === "admin"
+                  ? p
+                  : (({ costCop, ...rest }) => rest)(p),
+              ),
+            );
           setMessage(
             cached
-              ? "Catálogo guardado " +
-                  new Date(cached.updatedAt).toLocaleString("es-CO") +
-                  " · stock sin garantía global sin red."
-              : "Servidor no disponible o sesión inválida: " + String(e),
+              ? "Catálogo guardado: disponibilidad sin garantía global sin red."
+              : "Conexión o sesión no disponible. Reautentica para enviar pedidos.",
           );
         }
       }
     };
     const work = async () => {
       try {
-        await ownSync?.sync();
+        await auth.flushLogout();
+        if (
+          auth.current?.actor.id === session.actor.id &&
+          auth.current.mode === "authenticated"
+        )
+          await ownWorker?.sync();
         await update();
-      } catch (e) {
+      } catch {
         if (active)
-          setMessage("Sincronización detenida; cola conservada: " + String(e));
+          setMessage(
+            "Sincronización pausada. Cola conservada; reautentica la misma cuenta.",
+          );
       }
     };
     void (async () => {
       try {
         if (native) {
-          const b = await openNativeOutbox(session.id);
+          ownBox = await openNativeOutbox(session.actor.id);
           if (!active) return;
-          ownBox = b;
-          ownSync = new Synchronizer(
-            b,
-            httpTransport(apiUrl, () => session.token),
+          ownWorker = new Synchronizer(
+            ownBox,
+            auth.transport(session.actor.id),
           );
           box.current = ownBox;
-          sync.current = ownSync;
+          worker.current = ownWorker;
           await update();
         }
         await refresh();
-        timer = setInterval(() => void work(), 5000);
-      } catch (e) {
-        if (active) setMessage("SQLite no disponible: " + String(e));
+        if (session.mode === "authenticated") {
+          socket.auth = await auth.socketCredentials(session.actor.id);
+          if (active) socket.connect();
+        }
+      } catch {
+        if (active)
+          setMessage(
+            "No se pudo iniciar la persistencia o sesión; no se borró la cola.",
+          );
       }
     })();
-    const socket = io(apiUrl, { auth: { token: session.token } });
     socket.on("connect", () => {
       void refresh();
       void work();
     });
     socket.on("change", () => void refresh());
+    const interval = setInterval(() => void work(), 5000),
+      renew = setTimeout(
+        () => {
+          if (session.mode === "authenticated")
+            void auth
+              .refresh()
+              .catch(() =>
+                setMessage("Sesión vencida. Reautentica antes de sincronizar."),
+              );
+        },
+        Math.max(1000, session.accessExpiresAt - Date.now() - 30000),
+      );
     window.addEventListener("online", work);
     return () => {
       active = false;
-      if (timer) clearInterval(timer);
+      clearInterval(interval);
+      clearTimeout(renew);
       socket.disconnect();
       window.removeEventListener("online", work);
       box.current = null;
-      sync.current = null;
+      worker.current = null;
     };
   }, [session]);
-  function connect() {
-    try {
-      const part = token.split(".")[1]!;
-      const payload = JSON.parse(
-        atob(part.replace(/-/g, "+").replace(/_/g, "/")),
-      ) as { sub: string; role: string };
-      if (!payload.sub) throw Error("Token inválido");
-      setProducts([]);
-      setCart([]);
-      setRows([]);
-      setOrders([]);
-      setSession({ token, id: payload.sub, role: payload.role });
-    } catch {
-      setMessage(
-        "Token inválido. Genera credenciales locales; el servidor verifica firma, rol y vencimiento.",
-      );
-    }
-  }
   async function send() {
     try {
       if (!cart.length) throw Error("Carrito vacío");
@@ -152,19 +152,21 @@ function App() {
         if (!box.current) throw Error("SQLite aún no está listo");
         await box.current.enqueue(draft);
         setRows(await box.current.list());
-        setMessage(
-          "Guardado durable como pending_sync. Aún sin confirmación, pago ni reserva global.",
-        );
         setCart([]);
-        await sync.current?.sync();
-        setRows(await box.current.list());
+        setMessage(
+          "Guardado pending_sync. Aún no pagado, confirmado ni reservado globalmente.",
+        );
+        if (session.mode === "authenticated") {
+          await worker.current?.sync();
+          setRows(await box.current.list());
+        }
       } else {
         const o = await request("/orders", {
           method: "POST",
           headers: { "Idempotency-Key": crypto.randomUUID() },
           body: JSON.stringify(draft),
         });
-        setMessage("Pedido confirmado por servidor: " + o.id);
+        setMessage("Pedido confirmado: " + o.id);
         setCart([]);
         setProducts((await request("/inventory")) as Product[]);
         setOrders((await request("/orders")) as unknown[]);
@@ -173,51 +175,50 @@ function App() {
       setMessage(String(e));
     }
   }
+  async function logout() {
+    if (
+      session.actor.guest &&
+      rows.some((r) => !r.resolved_by && r.status !== "synced")
+    ) {
+      setMessage(
+        "Conserva la sesión invitada hasta sincronizar o revisar sus pendientes. No se reasignan a otra cuenta.",
+      );
+      return;
+    }
+    await auth.logout();
+  }
   return (
     <>
       <header>
         <span className="mark">⌂</span>
         <div>
           <strong>Minimarket La Playita</strong>
-          <small>Primer incremento · desarrollo separado del prototipo</small>
+          <small>
+            Desarrollo · {native ? "Móvil SQLite" : "Web conectada"}
+          </small>
         </div>
-        <span className="pill">
-          {native ? "Móvil · SQLite" : "Web · requiere conexión"}
-        </span>
+        <button onClick={() => void logout()}>Salir</button>
       </header>
       <main>
         <section className="intro">
           <p className="eyebrow">DEL CAMPO A TU MESA</p>
-          <h1>Un pedido, sin perderlo.</h1>
-          <p>Catálogo, pedido y sincronización · recogida en tienda · COP.</p>
+          <h1>Tu tienda, a la mano.</h1>
+          <p>Recogida en tienda · COP · Libra = 500 g.</p>
           <small>
-            Esta base aún no sustituye el diseño aprobado. Sin procesamiento de
-            pagos; Nequi real pendiente. Offline solo móvil.
+            {session.actor.label} · {session.actor.role} ·{" "}
+            {session.mode === "offline"
+              ? "Modo local: reautenticar para enviar"
+              : "Sesión activa"}
           </small>
         </section>
-        <section className="panel">
-          <h2>Sesión de desarrollo</h2>
-          <p>
-            Usa un JWT local generado con <code>npm run dev:credentials</code>.
-            No se guarda en localStorage ni en SQLite. El servidor verifica los
-            permisos.
-          </p>
-          <label>
-            Token
-            <input
-              type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              autoComplete="off"
-            />
-          </label>
-          <button onClick={connect}>Conectar</button>
-          {session && (
-            <small>
-              {session.role} · {session.id}
-            </small>
-          )}
-        </section>
+        {session.actor.role === "admin" && session.mode === "authenticated" && (
+          <Link to="/admin/users">Gestionar administradores y vendedores</Link>
+        )}
+        {session.mode === "offline" && !session.actor.guest && (
+          <button onClick={() => void auth.logout()}>
+            Reautenticar (cola conservada)
+          </button>
+        )}
         <p role="status" className="status">
           {message}
         </p>
@@ -233,8 +234,7 @@ function App() {
         </div>
         {!products.length && (
           <p className="empty">
-            Esperando catálogo autorizado. En móvil se reutiliza la última
-            consulta guardada de la misma cuenta.
+            Sin catálogo disponible. La primera visita requiere conexión.
           </p>
         )}
         <section className="panel">
@@ -257,31 +257,33 @@ function App() {
             </div>
           ))}
           <label>
-            Cliente opcional · vacío = Cliente general
+            Nombre opcional · vacío = Cliente general
             <input
               maxLength={100}
               value={client}
               onChange={(e) => setClient(e.target.value)}
             />
           </label>
-          <p>
-            Efectivo al recoger. Precio y disponibilidad se validan al enviar.
-          </p>
-          <button
-            disabled={!session || !cart.length}
-            onClick={() => void send()}
-          >
-            {native ? "Guardar en SQLite y sincronizar" : "Enviar online"}
+          <p>Efectivo al recoger. Sin procesamiento de pagos Nequi.</p>
+          <button disabled={!cart.length} onClick={() => void send()}>
+            {native ? "Guardar pedido durable" : "Enviar pedido online"}
           </button>
         </section>
         {native && (
           <section className="panel">
-            <h2>Cola durable</h2>
+            <h2>Cola de esta identidad</h2>
             <button
               onClick={() => {
-                void sync.current
+                void worker.current
                   ?.sync()
-                  .then(async () => setRows(await box.current!.list()));
+                  .then(async () => {
+                    if (box.current) setRows(await box.current.list());
+                  })
+                  .catch(() =>
+                    setMessage(
+                      "Sesión/conexión no disponible. Pendientes conservados.",
+                    ),
+                  );
               }}
             >
               Sincronizar
@@ -295,9 +297,7 @@ function App() {
                 <p>{row.last_error}</p>
                 {row.response && <pre>{row.response}</pre>}
                 {row.resolved_by && (
-                  <small>
-                    Revisión: {row.resolved_by}. Original conservado.
-                  </small>
+                  <small>Revisión creada; original conservado.</small>
                 )}
                 {row.status === "conflict" && !row.resolved_by && (
                   <button
@@ -319,11 +319,11 @@ function App() {
           <section className="panel">
             <h2>Revisión explícita</h2>
             <p>
-              Edición técnica temporal: verifica datos y precio actual. Crea una
-              clave nueva sin borrar la solicitud original.
+              Editor técnico temporal. No modifica el original ni confirma el
+              pedido.
             </p>
             <textarea
-              rows={12}
+              rows={10}
               value={revision.text}
               onChange={(e) =>
                 setRevision({ ...revision, text: e.target.value })
@@ -335,12 +335,12 @@ function App() {
                   try {
                     await box.current!.revise(
                       revision.key,
-                      JSON.parse(revision.text) as OrderDraft,
+                      JSON.parse(revision.text),
                     );
                     setRevision(null);
                     setRows(await box.current!.list());
-                  } catch (e) {
-                    setMessage(String(e));
+                  } catch {
+                    setMessage("Revisa la solicitud antes de guardar.");
                   }
                 })();
               }}
@@ -351,14 +351,16 @@ function App() {
           </section>
         )}
         <section className="panel">
-          <h2>Pedidos recuperados por REST</h2>
+          <h2>Mis pedidos recuperados por REST</h2>
           {orders.map((o, i) => (
             <pre key={i}>{JSON.stringify(o, null, 2)}</pre>
           ))}
           {!orders.length && <p className="empty">Sin pedidos recuperados.</p>}
         </section>
       </main>
-      <footer>Local · Sin publicación · Datos del prototipo intactos</footer>
+      <footer>
+        Desarrollo local · Sin publicación de la app · Prototipo separado
+      </footer>
     </>
   );
 }
@@ -453,4 +455,43 @@ function ProductCard({
     </article>
   );
 }
-createRoot(document.getElementById("root")!).render(<App />);
+function Root() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    void auth
+      .restore()
+      .catch(() => {})
+      .finally(() => setReady(true));
+  }, []);
+  if (!ready)
+    return (
+      <main>
+        <p role="status">Comprobando sesión…</p>
+      </main>
+    );
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="/app/*"
+          element={
+            <Protected>
+              <App />
+            </Protected>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <Protected admin>
+              <StaffUsers />
+            </Protected>
+          }
+        />
+        <Route path="*" element={<Navigate to="/app" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+createRoot(document.getElementById("root")!).render(<Root />);

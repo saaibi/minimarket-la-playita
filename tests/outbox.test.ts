@@ -139,7 +139,7 @@ test("SQLite real: usuario aislado, 401 requiere revisión y catálogo no se cru
     status: 401,
     body: { code: "AUTH_REQUIRED" },
   })).sync();
-  assert.equal((await a.list())[0]!.status, "conflict");
+  assert.equal((await a.list())[0]!.status, "pending_sync");
   db.close();
 });
 test("dominio: unidades 15/30, precios propios, gramos y contrato estricto", () => {
@@ -157,4 +157,33 @@ test("dominio: unidades 15/30, precios propios, gramos y contrato estricto", () 
     false,
   );
   assert.equal(canonical({ b: 1, a: 2 }), canonical({ a: 2, b: 1 }));
+});
+
+test("SQLite real: autenticación vencida conserva clave y permite reintento tras reautenticar", async () => {
+  const db = new NodeSqliteDriver(":memory:"),
+    box = new Outbox(db, "account-a");
+  await box.init();
+  const key = await box.enqueue(draft, crypto.randomUUID(), 0),
+    keys: string[] = [];
+  let now = 0,
+    valid = false;
+  const worker = new Synchronizer(
+    box,
+    async (k) => {
+      keys.push(k);
+      return valid
+        ? { status: 201, body: { id: "same-server-order" } }
+        : { status: 401, body: { code: "AUTH_REQUIRED" } };
+    },
+    () => now,
+  );
+  await worker.sync();
+  assert.equal((await box.list())[0]!.status, "pending_sync");
+  assert.equal((await box.list())[0]!.request_key, key);
+  valid = true;
+  now = 30001;
+  await worker.sync();
+  assert.equal((await box.list())[0]!.status, "synced");
+  assert.deepEqual(keys, [key, key]);
+  db.close();
 });

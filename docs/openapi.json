@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Minimarket La Playita",
-    "version": "0.1.0",
-    "description": "Primer incremento local. PostgreSQL transaccional. JWT local de desarrollo; onboarding/autenticación productiva pendiente. Offline solo Android/iOS: pending_sync sin reserva global. Nequi no integrado y nunca se marca pagado por aceptar."
+    "version": "0.2.0",
+    "description": "Sesiones opacas verificadas contra PostgreSQL (no JWT demo): acceso 5 min, refresh rotatorio 7 días, límite absoluto 30 días y revocación/reuso. Invitado buyer emitido servidor; personal con contraseña y alta admin. Web cookies HttpOnly + CSRF/Origin; nativo secure storage. Google/Apple no conectados; WhatsApp futuro sin proveedor por defecto."
   },
   "servers": [
     {
@@ -11,6 +11,9 @@
     }
   ],
   "security": [
+    {
+      "sessionCookie": []
+    },
     {
       "bearer": []
     }
@@ -335,6 +338,575 @@
           }
         }
       }
+    },
+    "/auth/login": {
+      "post": {
+        "security": [],
+        "description": "X-Playita-Client obligatorio en mutaciones web; Origin allowlist y Content-Type JSON. Refresh/logout web requieren X-CSRF-Token tomado de playita_csrf. No registrar secretos. Login/guest sujetos a rate limit.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string",
+                    "maxLength": 128
+                  }
+                },
+                "required": ["email", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Web: actor + expiración y Set-Cookie HttpOnly, sin tokens en body. Nativo X-Playita-Client:native: actor + accessToken/refreshToken para vault seguro."
+          },
+          "400": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/guest": {
+      "post": {
+        "security": [],
+        "description": "X-Playita-Client obligatorio en mutaciones web; Origin allowlist y Content-Type JSON. Refresh/logout web requieren X-CSRF-Token tomado de playita_csrf. No registrar secretos. Login/guest sujetos a rate limit.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Web: actor + expiración y Set-Cookie HttpOnly, sin tokens en body. Nativo X-Playita-Client:native: actor + accessToken/refreshToken para vault seguro."
+          },
+          "400": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "security": [],
+        "description": "X-Playita-Client obligatorio en mutaciones web; Origin allowlist y Content-Type JSON. Refresh/logout web requieren X-CSRF-Token tomado de playita_csrf. No registrar secretos. Login/guest sujetos a rate limit.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "refreshToken": {
+                    "type": "string",
+                    "description": "Solo nativo; web usa cookie y body vacío"
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Web: actor + expiración y Set-Cookie HttpOnly, sin tokens en body. Nativo X-Playita-Client:native: actor + accessToken/refreshToken para vault seguro."
+          },
+          "400": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "security": [],
+        "description": "X-Playita-Client obligatorio en mutaciones web; Origin allowlist y Content-Type JSON. Refresh/logout web requieren X-CSRF-Token tomado de playita_csrf. No registrar secretos. Login/guest sujetos a rate limit.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "refreshToken": {
+                    "type": "string",
+                    "description": "Solo nativo; web usa cookie y body vacío"
+                  }
+                },
+                "required": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Web: actor + expiración y Set-Cookie HttpOnly, sin tokens en body. Nativo X-Playita-Client:native: actor + accessToken/refreshToken para vault seguro."
+          },
+          "400": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Identidad y vencimiento actuales, rol consultado al servidor"
+          },
+          "401": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/options": {
+      "get": {
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Guest/staff activos; Google/Apple disponibles=false hasta integración real"
+          }
+        }
+      }
+    },
+    "/auth/users": {
+      "get": {
+        "description": "Solo admin, lista staff sin contraseñas/hashes",
+        "responses": {
+          "200": {
+            "description": "Lista staff"
+          },
+          "401": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Solo admin. Crea seller/admin; no registro público.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 128
+                  },
+                  "role": {
+                    "enum": ["admin", "seller"]
+                  }
+                },
+                "required": ["email", "password", "role"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Cuenta creada sin hash/contraseña en respuesta"
+          },
+          "400": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/users/{id}/disable": {
+      "post": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "description": "Solo admin; desactiva y revoca sesiones. No permite desactivarse a sí mismo ni eliminar último admin.",
+        "responses": {
+          "200": {
+            "description": "Desactivada"
+          },
+          "401": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/whatsapp/request": {
+      "post": {
+        "security": [],
+        "description": "Puerto futuro opcional, no requerido para comprar. Sin proveedor devuelve 503; habilitar Twilio puede generar costes, no activado en esta entrega.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "phone": {
+                    "type": "string",
+                    "pattern": "^\\+[1-9]\\d{7,14}$"
+                  }
+                },
+                "required": ["phone"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "challengeId y expiración, nunca código OTP"
+          },
+          "429": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/whatsapp/verify": {
+      "post": {
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "challengeId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "code": {
+                    "type": "string"
+                  }
+                },
+                "required": ["challengeId", "code"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Web: actor + expiración y Set-Cookie HttpOnly, sin tokens en body. Nativo X-Playita-Client:native: actor + accessToken/refreshToken para vault seguro."
+          },
+          "401": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -342,7 +914,12 @@
       "bearer": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "JWT"
+        "bearerFormat": "Opaque server-validated access token"
+      },
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "playita_access"
       }
     },
     "schemas": {

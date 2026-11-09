@@ -1,38 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { SignJWT } from "jose";
-import { authenticate } from "../apps/api/src/auth.js";
-const secret = "test-only-auth-key-with-at-least-32-characters";
-async function token(role: string, expires = "5m", key = secret) {
-  return new SignJWT({ role })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuer("playita-local")
-    .setAudience("playita-api")
-    .setSubject("user-a")
-    .setExpirationTime(expires)
-    .sign(new TextEncoder().encode(key));
-}
-test("JWT verifica firma, emisor, audiencia, expiración y rol, no confía en selector cliente", async () => {
-  assert.deepEqual(
-    await authenticate("Bearer " + (await token("buyer")), secret),
-    { id: "user-a", role: "buyer" },
-  );
-  await assert.rejects(authenticate(undefined, secret));
-  await assert.rejects(
-    authenticate(
-      "Bearer " +
-        (await token(
-          "admin",
-          "5m",
-          "different-secret-key-with-at-least-32-characters",
-        )),
-      secret,
-    ),
-  );
-  await assert.rejects(
-    authenticate("Bearer " + (await token("buyer", "-1s")), secret),
-  );
-  await assert.rejects(
-    authenticate("Bearer " + (await token("superadmin")), secret),
-  );
+import { hashPassword, verifyPassword } from "../apps/api/src/password.js";
+test("contraseñas: scrypt con sal distinta, verificación y rechazo de formato inválido", async () => {
+  const pass = "test-password-not-a-runtime-account",
+    a = await hashPassword(pass),
+    b = await hashPassword(pass);
+  assert.notEqual(a, b);
+  assert.equal(a.includes(pass), false);
+  assert.ok(a.startsWith("scrypt$131072$8$1$"));
+  assert.equal(await verifyPassword(pass, a), true);
+  assert.equal(await verifyPassword("incorrect-password", a), false);
+  assert.equal(await verifyPassword(pass, "invalid"), false);
 });
