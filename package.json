@@ -1,0 +1,34 @@
+{
+  "name": "playita-development",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @playita/shared && npm run build -w @playita/mobile && npm run build -w @playita/api && npm run build -w @playita/web",
+    "test": "tsx --tsconfig tsconfig.json --test tests/*.test.ts",
+    "test:integration": "npm run build -w @playita/shared && npm run build -w @playita/api && tsx --tsconfig tsconfig.json --test tests/integration.ts",
+    "dev:api": "npm run dev -w @playita/api",
+    "dev:web": "npm run dev -w @playita/web",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "dev:credentials": "tsx scripts/dev-credentials.ts",
+    "typecheck:tests": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.15.0",
+    "prettier": "3.9.10",
+    "tsx": "^4.21.0",
+    "typescript": "~5.9.3"
+  },
+  "dependencies": {
+    "jose": "^6.1.0",
+    "pg": "^8.16.3",
+    "zod": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@playita/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@playita/shared": "0.1.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor-community/sqlite": "8.1.1"
+  }
+}
