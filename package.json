@@ -17,7 +17,8 @@
     "admin:bootstrap": "npm run build -w @playita/shared && node --import tsx scripts/bootstrap-admin.ts",
     "mobile:check": "node --import tsx scripts/check-mobile-env.ts",
     "build:api": "npm run build -w @playita/shared && npm run build -w @playita/api",
-    "start:api": "npm run start -w @playita/api"
+    "start:api": "npm run start -w @playita/api",
+    "start:render": "npm run db:migrate && npm run start:api"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.3",
