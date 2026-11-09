@@ -14,7 +14,7 @@
     "dev:web": "npm run dev -w @playita/web",
     "db:migrate": "node --import tsx scripts/migrate.ts",
     "typecheck:tests": "tsc -p tsconfig.json",
-    "admin:bootstrap": "node --import tsx scripts/bootstrap-admin.ts",
+    "admin:bootstrap": "npm run build -w @playita/shared && node --import tsx scripts/bootstrap-admin.ts",
     "mobile:check": "node --import tsx scripts/check-mobile-env.ts"
   },
   "devDependencies": {

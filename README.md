@@ -29,11 +29,10 @@ Node 24+ (este entorno: 26.5), npm y PostgreSQL 14+ accesible. No hace falta un 
 npm ci
 cp .env.example .env
 # Editar DATABASE_URL localmente, con la base/usuario de desarrollo reales.
+npm run build
 npm run db:migrate
 # Definir PLAYITA_ADMIN_EMAIL y PLAYITA_ADMIN_PASSWORD solo localmente.
 npm run admin:bootstrap
-npm run build
-npm run db:migrate
 npm run dev:api
 ```
 

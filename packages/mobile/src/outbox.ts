@@ -241,12 +241,14 @@ export class Synchronizer {
     );
   }
 }
+/** Low-level native transport; the app uses SessionClient for refresh and account binding. */
 export function httpTransport(baseUrl: string, token: () => string): Transport {
   return async (key, draft) => {
     const response = await fetch(baseUrl + "/orders", {
       method: "POST",
       headers: {
         Authorization: "Bearer " + token(),
+        "X-Playita-Client": "native",
         "Content-Type": "application/json",
         "Idempotency-Key": key,
       },
