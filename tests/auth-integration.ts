@@ -341,13 +341,24 @@ test(
         ).status,
         401,
       );
-      for (let i = 0; i < 11; i++) {
+      let limited = false;
+      // Fixed windows can roll during this test. Two budgets still cap 22 attempts.
+      for (let i = 0; i < 22; i++) {
         const response = await post("/auth/login", {
           email: "limited@example.invalid",
           password: "wrong",
         });
-        if (i === 10) assert.equal(response.status, 429);
+        if (response.status === 429) {
+          limited = true;
+          break;
+        }
+        assert.equal(response.status, 401);
       }
+      assert.equal(
+        limited,
+        true,
+        "Login must be limited even if the 15-minute window rolls",
+      );
     } finally {
       if (server) await server.close();
       await root.query(`DROP SCHEMA ${schema} CASCADE`);
