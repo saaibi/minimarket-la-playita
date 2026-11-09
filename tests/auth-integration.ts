@@ -1,4 +1,5 @@
 import test from "node:test";
+import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { Pool } from "pg";
 import { randomInt } from "node:crypto";
@@ -42,6 +43,39 @@ test(
         verificationProvider: provider,
       });
       const pass = "only-tests-" + crypto.randomUUID();
+      const failedBootstrap = spawnSync(
+        process.execPath,
+        ["--import", "tsx", "scripts/bootstrap-render.ts"],
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            DATABASE_URL: url.toString(),
+            PLAYITA_BOOTSTRAP_ADMIN: "once",
+            PLAYITA_ADMIN_EMAIL: "owner@example.invalid",
+            PLAYITA_ADMIN_PASSWORD: "short",
+          },
+        },
+      );
+      assert.equal(
+        failedBootstrap.status,
+        0,
+        "optional bootstrap must not stop healthy API startup",
+      );
+      assert.match(failedBootstrap.stderr, /ADMIN_PASSWORD_TOO_SHORT/);
+      assert.ok(!failedBootstrap.stderr.includes("short"));
+
+      await assert.rejects(
+        bootstrapAdmin(server.pool, "owner@example.invalid", "short"),
+      );
+      assert.equal(
+        (
+          await server.pool.query(
+            "SELECT count(*)::int AS count FROM app_users WHERE role='admin'",
+          )
+        ).rows[0].count,
+        0,
+      );
       await bootstrapAdmin(server.pool, "owner@example.invalid", pass);
       await assert.rejects(
         bootstrapAdmin(server.pool, "another@example.invalid", pass),
@@ -61,6 +95,12 @@ test(
         1,
       );
       await server.app.listen(0, "127.0.0.1");
+      assert.equal(
+        await bootstrapAdmin(server.pool, "invalid", "short", {
+          onlyIfMissing: true,
+        }),
+        false,
+      );
       const base =
         "http://127.0.0.1:" + server.app.getHttpServer().address().port;
       const native = {

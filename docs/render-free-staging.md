@@ -34,3 +34,11 @@ Con el commit que incorpora `scripts/bootstrap-render.ts` desplegado, abrir **En
 - `PLAYITA_ADMIN_PASSWORD`: contraseña propia de 12–128 caracteres, ingresada únicamente en el panel seguro, sin enviarla por chat.
 
 El propietario debe completar la entrada y guardar/reiniciar el servicio desde Render. Al arrancar, el script crea el primer admin bajo advisory lock solo si falta. Si ya existe no cambia su contraseña ni crea otro. Tras éxito, eliminar las tres variables temporales y guardar/reiniciar. El acceso admin quedará disponible con ese correo y contraseña desde la aplicación. No hay cuenta admin/admin ni endpoint de bootstrap. Si el panel muestra pago/upgrade, detenerse; este procedimiento no requiere un plan de pago.
+
+### Diagnóstico del bootstrap
+
+El bootstrap opcional no bloquea el arranque de la API si su configuración falla. Mantiene validación de credenciales, transacción y advisory lock; no crea una cuenta por defecto. Un administrador existente se detecta antes de validar variables que ya no hacen falta; nunca se resetea su contraseña.
+
+Los logs muestran exclusivamente códigos fijos: `ADMIN_EMAIL_INVALID` (PLAYITA_ADMIN_EMAIL debe ser un correo válido, máximo 254 caracteres), `ADMIN_PASSWORD_TOO_SHORT`/`TOO_LONG` (PLAYITA_ADMIN_PASSWORD requiere 12–128 caracteres), o códigos de conexión/permisos/esquema/conflicto. No se registran inputs, SQL detail, mensajes de excepción ni stack traces. No atribuir la causa sin observar el código del servidor. La API puede estar saludable y el bootstrap pendiente; health no significa que exista un administrador.
+
+No eliminar las variables temporales hasta que el propietario haya podido iniciar sesión. Si un valor necesita corrección, el propietario debe ingresarlo y guardarlo personalmente en el panel seguro. No enviar contraseñas por chat.
