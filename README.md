@@ -6,7 +6,7 @@ Base nueva, separada del prototipo ejecutable. React + TypeScript + Vite, Capaci
 
 - Build de los cuatro workspaces aprobado.
 - 7 pruebas aprobadas: SQLite real mediante `node:sqlite` (archivo durable, reapertura, leases, reintentos, conflictos y aislamiento), dominio y JWT. El transporte de algunas pruebas es un doble explícito; no prueba el servidor PostgreSQL.
-- La prueba de integración real PostgreSQL + HTTP Nest + SQLite + Socket.IO está implementada, pero se omitió por ausencia de servidor PostgreSQL ejecutable en este sandbox. PostgreSQL 14 está instalado; `initdb` falla con `shmget: Operation not permitted`. Docker no está activo. No se reemplazó PostgreSQL por SQLite ni por una emulación.
+- La integración PostgreSQL 16 + HTTP Nest + SQLite real + Socket.IO **pasó en GitHub Actions**; [consultar CI](https://github.com/saaibi/minimarket-la-playita/actions/workflows/ci.yml). Localmente se omitió por ausencia de servidor PostgreSQL ejecutable en este sandbox. PostgreSQL 14 está instalado; `initdb` falla con `shmget: Operation not permitted`. Docker no está activo. No se reemplazó PostgreSQL por SQLite ni por una emulación.
 - Plugin Capacitor SQLite typechecked contra su API publicada; **no ejecutado en Android/iPhone**. No se hizo revisión visual de navegador.
 - Frontend local: http://127.0.0.1:5173/ (muestra la base; inventario/pedidos necesitan API + PostgreSQL real).
 - El prototipo anterior permanece intacto en http://127.0.0.1:4173/; sus archivos y localStorage no se importan ni modifican.
@@ -50,7 +50,7 @@ npm run typecheck:tests
 TEST_DATABASE_URL='postgresql://USUARIO:CLAVE@127.0.0.1:5432/BASE_TEST' npm run test:integration
 ```
 
-Usar una base de prueba con permisos para crear un esquema temporal. La integración crea y elimina únicamente su esquema `it_<uuid>`, no borra tablas existentes. Sin esa variable la prueba se marca explícitamente omitida. CI está preparado con PostgreSQL 16 real, sin desplegar la app; los resultados remotos deben verificarse antes de afirmar integración aprobada.
+Usar una base de prueba con permisos para crear un esquema temporal. La integración crea y elimina únicamente su esquema `it_<uuid>`, no borra tablas existentes. Sin esa variable la prueba se marca explícitamente omitida. CI está preparado con PostgreSQL 16 real, sin desplegar la app; la ejecución remota ya verificó la integración del primer incremento. Consultar el estado del commit actual en el enlace de CI.
 
 ## Flujo y garantías implementadas
 

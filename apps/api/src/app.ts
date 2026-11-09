@@ -54,13 +54,11 @@ class ApiController {
     const parsed = orderDraftSchema.safeParse(input),
       id = key(req);
     if (!parsed.success || !id.success)
-      return res
-        .status(400)
-        .json({
-          code: "VALIDATION_ERROR",
-          message: "Body válido e Idempotency-Key UUID son obligatorios",
-          details: parsed.error?.flatten(),
-        });
+      return res.status(400).json({
+        code: "VALIDATION_ERROR",
+        message: "Body válido e Idempotency-Key UUID son obligatorios",
+        details: parsed.error?.flatten(),
+      });
     const reply = await this.store.create(req.actor, id.data, parsed.data);
     res.setHeader("Idempotency-Replayed", String(!!reply.replayed));
     return res.status(reply.status).json(reply.body);
@@ -117,10 +115,10 @@ export async function createApp(config: {
   let io: Server | undefined;
   const store = new Store(pool, (events) => {
     for (const event of events) {
-      const room = event.ownerId ? "owner:" + event.ownerId : "catalog";
-      const target = io?.to(room);
-      if (event.ownerId) target?.to("staff");
-      target?.emit("change", event);
+      const rooms = event.ownerId
+        ? ["owner:" + event.ownerId, "staff"]
+        : "catalog";
+      io?.to(rooms).emit("change", event);
     }
   });
   @Module({

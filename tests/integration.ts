@@ -71,19 +71,31 @@ test(
       const db = new NodeSqliteDriver(":memory:"),
         box = new Outbox(db, "buyer-a");
       await box.init();
-      const key = await box.enqueue(draft);
+      const key = await box.enqueue(draft, crypto.randomUUID(), 0);
       assert.equal((await box.list())[0]!.status, "pending_sync");
       const socket = io(base, { auth: { token }, transports: ["websocket"] });
       await new Promise<void>((resolve, reject) => {
         socket.once("connect", () => resolve());
         socket.once("connect_error", reject);
       });
+      const staffSocket = io(base, {
+        auth: { token: seller },
+        transports: ["websocket"],
+      });
+      await new Promise<void>((resolve, reject) => {
+        staffSocket.once("connect", () => resolve());
+        staffSocket.once("connect_error", reject);
+      });
+      const staffChanges: Array<{ kind: string }> = [];
+      staffSocket.on("change", (e) => staffChanges.push(e));
       const changes: unknown[] = [];
       socket.on("change", (e) => changes.push(e));
-      const worker = new Synchronizer(
-        box,
-        httpTransport(base, () => token),
-      );
+      const transport = httpTransport(base, () => token);
+      const claim = (await box.claim(0))!;
+      const initial = await transport(claim.request_key, draft);
+      assert.equal(initial.status, 201);
+      // Simulate process death before SQLite ack. Real HTTP replay after lease recovery.
+      const worker = new Synchronizer(box, transport, () => 60001);
       await worker.sync();
       const response = JSON.parse((await box.list())[0]!.response!);
       assert.equal(response.totalCop, 17000);
@@ -107,6 +119,41 @@ test(
           )
         ).rows[0].reserved,
         30,
+      );
+      const mismatch = await fetch(base + "/orders", {
+        method: "POST",
+        headers: { ...headers, "Idempotency-Key": key },
+        body: JSON.stringify({
+          ...draft,
+          lines: [{ ...draft.lines[0]!, quantity: 2 }],
+        }),
+      });
+      assert.equal(mismatch.status, 409);
+      assert.equal((await mismatch.json()).code, "IDEMPOTENCY_MISMATCH");
+      const priceConflict = await fetch(base + "/orders", {
+        method: "POST",
+        headers: { ...headers, "Idempotency-Key": crypto.randomUUID() },
+        body: JSON.stringify({
+          ...draft,
+          lines: [{ ...draft.lines[0]!, expectedPriceCop: 16999 }],
+        }),
+      });
+      assert.equal(priceConflict.status, 409);
+      assert.equal((await priceConflict.json()).code, "PRICE_CHANGED");
+      const otherToken = await new SignJWT({ role: "buyer" })
+        .setProtectedHeader({ alg: "HS256" })
+        .setSubject("buyer-other")
+        .setIssuer("playita-local")
+        .setAudience("playita-api")
+        .setExpirationTime("10m")
+        .sign(new TextEncoder().encode(secret));
+      assert.equal(
+        (
+          await fetch(base + `/orders/${response.id}`, {
+            headers: { Authorization: "Bearer " + otherToken },
+          })
+        ).status,
+        404,
       );
       const forbidden = await fetch(base + `/orders/${response.id}/actions`, {
         method: "POST",
@@ -153,6 +200,8 @@ test(
       assert.ok(replayEvents.some((e: any) => e.kind === "inventory.changed"));
       await new Promise((r) => setTimeout(r, 30));
       assert.ok(changes.length > 0);
+      assert.ok(staffChanges.some((e) => e.kind === "order.confirmed"));
+      staffSocket.disconnect();
       socket.disconnect();
       db.close();
     } finally {
