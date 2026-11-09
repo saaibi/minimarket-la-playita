@@ -36,7 +36,7 @@ const contract = {
     title: "Minimarket La Playita",
     version: "0.1.0",
     description:
-      "Primer incremento local. PostgreSQL transaccional. JWT local de desarrollo; onboarding/autenticación productiva pendiente. Offline solo Android/iOS: pending_sync sin reserva global. Nequi no integrado y nunca se marca pagado por aceptar.",
+      "Base de desarrollo. PostgreSQL transaccional. Sesiones opacas web/nativas con rotación; despliegue pendiente. Offline solo Android/iOS: pending_sync sin reserva global. Nequi no integrado y nunca se marca pagado por aceptar.",
   },
   servers: [{ url: "http://127.0.0.1:4300" }],
   security: [{ bearer: [] }],

@@ -23,8 +23,12 @@ const server = await createApp({
     .filter(Boolean),
   verificationProvider,
 });
-await server.app.listen(Number(process.env.PORT || 4300), "127.0.0.1");
-console.log("Playita API http://127.0.0.1:" + String(process.env.PORT || 4300));
+const host =
+  process.env.HOST ||
+  (process.env.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1");
+const port = Number(process.env.PORT || 4300);
+await server.app.listen(port, host);
+console.log(`Playita API listening on ${host}:${port}`);
 for (const signal of ["SIGINT", "SIGTERM"])
   process.once(signal, () => {
     void server.close().then(() => process.exit(0));

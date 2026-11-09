@@ -235,10 +235,18 @@
                 "properties": {
                   "action": {
                     "type": "string",
-                    "enum": ["accept", "ready", "pay_cash", "deliver", "cancel"]
+                    "enum": [
+                      "accept",
+                      "ready",
+                      "pay_cash",
+                      "deliver",
+                      "cancel"
+                    ]
                   }
                 },
-                "required": ["action"],
+                "required": [
+                  "action"
+                ],
                 "additionalProperties": false
               }
             }
@@ -360,7 +368,10 @@
                     "maxLength": 128
                   }
                 },
-                "required": ["email", "password"]
+                "required": [
+                  "email",
+                  "password"
+                ]
               }
             }
           }
@@ -692,10 +703,17 @@
                     "maxLength": 128
                   },
                   "role": {
-                    "enum": ["admin", "seller"]
+                    "enum": [
+                      "admin",
+                      "seller"
+                    ]
                   }
                 },
-                "required": ["email", "password", "role"]
+                "required": [
+                  "email",
+                  "password",
+                  "role"
+                ]
               }
             }
           }
@@ -815,7 +833,9 @@
                     "pattern": "^\\+[1-9]\\d{7,14}$"
                   }
                 },
-                "required": ["phone"]
+                "required": [
+                  "phone"
+                ]
               }
             }
           }
@@ -866,7 +886,10 @@
                     "type": "string"
                   }
                 },
-                "required": ["challengeId", "code"]
+                "required": [
+                  "challengeId",
+                  "code"
+                ]
               }
             }
           }
@@ -954,13 +977,20 @@
                   "maximum": 100000000
                 }
               },
-              "required": ["productId", "quantity", "expectedPriceCop"],
+              "required": [
+                "productId",
+                "quantity",
+                "expectedPriceCop"
+              ],
               "additionalProperties": false
             }
           },
           "paymentMethod": {
             "type": "string",
-            "enum": ["cash", "nequi"]
+            "enum": [
+              "cash",
+              "nequi"
+            ]
           },
           "client": {
             "type": "object",
@@ -975,11 +1005,16 @@
                 "maxLength": 100
               }
             },
-            "required": ["name"],
+            "required": [
+              "name"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["lines", "paymentMethod"],
+        "required": [
+          "lines",
+          "paymentMethod"
+        ],
         "additionalProperties": false
       },
       "Order": {
@@ -998,10 +1033,20 @@
             "format": "uuid"
           },
           "status": {
-            "enum": ["confirmed", "accepted", "ready", "delivered", "cancelled"]
+            "enum": [
+              "confirmed",
+              "accepted",
+              "ready",
+              "delivered",
+              "cancelled"
+            ]
           },
           "paymentStatus": {
-            "enum": ["pending", "not_integrated", "paid"]
+            "enum": [
+              "pending",
+              "not_integrated",
+              "paid"
+            ]
           },
           "totalCop": {
             "type": "integer"
@@ -1026,7 +1071,10 @@
             "format": "uuid"
           },
           "kind": {
-            "enum": ["unit", "weight"]
+            "enum": [
+              "unit",
+              "weight"
+            ]
           },
           "stock": {
             "type": "integer"
@@ -1054,7 +1102,9 @@
       },
       "Error": {
         "type": "object",
-        "required": ["code"],
+        "required": [
+          "code"
+        ],
         "properties": {
           "code": {
             "type": "string"

@@ -10,9 +10,11 @@ import {
   Query,
   Module,
   Inject,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { Pool } from "pg";
+import { databaseOptions } from "./database-options.js";
 import { Server } from "socket.io";
 import { orderDraftSchema, actionSchema, type Actor } from "@playita/shared";
 import { z } from "zod";
@@ -29,8 +31,18 @@ function key(req: Request) {
 class ApiController {
   constructor(@Inject(STORE) private readonly store: Store) {}
   @Get("health") async health() {
-    await this.store.pool.query("SELECT 1");
-    return { status: "ok", database: "postgresql", increment: 1 };
+    try {
+      const healthQuery = {
+        text: "SELECT version FROM schema_migrations WHERE version = $1",
+        values: ["002_sessions.sql"],
+        query_timeout: 2500,
+      };
+      const result = await this.store.pool.query(healthQuery);
+      if (result.rowCount !== 1) throw Error("Migrations missing");
+      return { status: "ok", database: "postgresql", increment: 2 };
+    } catch {
+      throw new ServiceUnavailableException({ status: "not_ready" });
+    }
   }
   @Get("inventory") inventory(@Req() req: Request) {
     return this.store.inventory(req.actor);
@@ -106,7 +118,7 @@ export async function createApp(config: {
   verificationProvider?: VerificationProvider;
   origins?: string[];
 }) {
-  const pool = new Pool({ connectionString: config.databaseUrl, max: 10 });
+  const pool = new Pool(databaseOptions(config.databaseUrl));
   try {
     await pool.query("SELECT 1");
   } catch (e) {

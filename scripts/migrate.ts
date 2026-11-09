@@ -1,10 +1,11 @@
 import { Pool } from "pg";
+import { databaseOptions } from "../apps/api/src/database-options.js";
 import { readdir, readFile } from "node:fs/promises";
 try {
   process.loadEnvFile(new URL("../.env", import.meta.url));
 } catch {}
 export async function migrate(databaseUrl: string) {
-  const pool = new Pool({ connectionString: databaseUrl }),
+  const pool = new Pool(databaseOptions(databaseUrl)),
     db = await pool.connect();
   try {
     await db.query("BEGIN");
