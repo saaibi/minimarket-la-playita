@@ -176,3 +176,33 @@ test("logout durante refresh no restaura una sesión ni token después del cierr
   assert.equal(client.current, null);
   assert.equal(await vault.get("session"), null);
 });
+
+test("restauración bloqueada vence sin borrar vault y una respuesta tardía no restaura sesión", async () => {
+  const { SessionClient } =
+    await import("../packages/mobile/src/session-client.js");
+  let release: (value: string | null) => void = () => {};
+  let removed = 0;
+  const stuck = new SessionClient({
+    base: "https://api.example",
+    mode: "native",
+    restoreTimeoutMs: 20,
+    vault: {
+      get: () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+      set: async () => {},
+      remove: async () => {
+        removed++;
+      },
+    },
+  });
+  await assert.rejects(
+    stuck.restore(),
+    (e: any) => e.code === "RESTORE_TIMEOUT",
+  );
+  release(null);
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(stuck.current, null);
+  assert.equal(removed, 0);
+});

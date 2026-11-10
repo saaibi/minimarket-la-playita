@@ -1,4 +1,5 @@
 import test from "node:test";
+import { bogotaDate } from "@playita/shared";
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { Pool } from "pg";
@@ -37,6 +38,12 @@ test(
     let server: Awaited<ReturnType<typeof createApp>> | undefined;
     try {
       await migrate(url.toString());
+      const settingsPool = new Pool({ connectionString: url.toString() });
+      await settingsPool.query(
+        "UPDATE store_settings SET schedule=schedule || $1::jsonb",
+        [JSON.stringify({ override: "open", overrideDate: bogotaDate() })],
+      );
+      await settingsPool.end();
       const provider = new TestVerification();
       server = await createApp({
         databaseUrl: url.toString(),

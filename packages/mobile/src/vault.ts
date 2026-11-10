@@ -12,7 +12,20 @@ export const nativeVault: SecretVault = {
   async get(key) {
     if (!Capacitor.isNativePlatform())
       throw Error("Native secure storage required");
-    return SecureStorage.getItem("playita_auth_" + key);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        SecureStorage.getItem("playita_auth_" + key),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("NATIVE_STORAGE_TIMEOUT")),
+            5000,
+          );
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
   },
   async set(key, value) {
     if (!Capacitor.isNativePlatform())

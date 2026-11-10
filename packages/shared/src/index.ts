@@ -27,6 +27,9 @@ export const orderDraftSchema = z
       .optional(),
   })
   .strict();
+export const saleDraftSchema = orderDraftSchema
+  .extend({ cashReceived: z.number().int().min(0).max(2000000000) })
+  .strict();
 export type OrderDraft = z.infer<typeof orderDraftSchema>;
 export type OrderResult = {
   id: string;
@@ -52,6 +55,13 @@ export type Product = {
   reserved: number;
   available: number;
   version: number;
+  category?: string;
+  code?: string;
+  supplier?: string;
+  description?: string;
+  photo?: string;
+  minimum?: number;
+  visible?: boolean;
   costCop?: number;
   presentations: Presentation[];
 };
@@ -101,3 +111,4 @@ export function canonical(value: unknown): string {
     "}"
   );
 }
+export * from "./management.js";

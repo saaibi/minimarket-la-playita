@@ -1,7 +1,8 @@
 import React from "react";
 import { useState } from "react";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { auth, useSession } from "./session.js";
+import { Brand } from "./ui.js";
 export function Login() {
   const session = useSession(),
     [email, setEmail] = useState(""),
@@ -25,8 +26,12 @@ export function Login() {
   }
   return (
     <main className="login-page">
+      <div className="login-brand">
+        <Brand />
+        <p className="eyebrow">CERCA DE TI, CADA DÍA</p>
+      </div>
       <section className="intro">
-        <p className="eyebrow">MINIMARKET LA PLAYITA</p>
+        <p className="eyebrow">BIENVENIDO A LA PLAYITA</p>
         <h1>Bienvenido a tu tienda.</h1>
         <p>
           Compra para recoger. Puedes entrar como invitado sin crear una cuenta.
@@ -93,7 +98,6 @@ export function Login() {
       <p role="alert" className="status">
         {error}
       </p>
-      <Link to="/app">Ir a la tienda con mi sesión</Link>
     </main>
   );
 }

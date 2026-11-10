@@ -1,4 +1,8 @@
-import { orderDraftSchema, type OrderDraft } from "@playita/shared";
+import {
+  orderDraftSchema,
+  saleDraftSchema,
+  type OrderDraft,
+} from "@playita/shared";
 export interface SqlDriver {
   execute(sql: string): Promise<void>;
   run(sql: string, values: unknown[]): Promise<void>;
@@ -17,7 +21,7 @@ export type OutboxRow = {
   response: string | null;
   resolved_by: string | null;
 };
-export const SQLITE_SCHEMA = `CREATE TABLE IF NOT EXISTS outbox(request_key TEXT PRIMARY KEY,owner_id TEXT NOT NULL,payload TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending_sync','syncing','synced','conflict')),attempts INTEGER NOT NULL DEFAULT 0,next_attempt_at INTEGER NOT NULL DEFAULT 0,lease_until INTEGER NOT NULL DEFAULT 0,lease_token TEXT,last_error TEXT,response TEXT,resolved_by TEXT,created_at INTEGER NOT NULL);CREATE INDEX IF NOT EXISTS outbox_owner ON outbox(owner_id,status,next_attempt_at);CREATE TABLE IF NOT EXISTS catalog_cache(owner_id TEXT PRIMARY KEY,payload TEXT NOT NULL,updated_at INTEGER NOT NULL);PRAGMA user_version=1;`;
+export const SQLITE_SCHEMA = `CREATE TABLE IF NOT EXISTS outbox(request_key TEXT PRIMARY KEY,owner_id TEXT NOT NULL,payload TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending_sync','syncing','synced','conflict')),attempts INTEGER NOT NULL DEFAULT 0,next_attempt_at INTEGER NOT NULL DEFAULT 0,lease_until INTEGER NOT NULL DEFAULT 0,lease_token TEXT,last_error TEXT,response TEXT,resolved_by TEXT,created_at INTEGER NOT NULL);CREATE INDEX IF NOT EXISTS outbox_owner ON outbox(owner_id,status,next_attempt_at);CREATE TABLE IF NOT EXISTS catalog_cache(owner_id TEXT PRIMARY KEY,payload TEXT NOT NULL,updated_at INTEGER NOT NULL);CREATE TABLE IF NOT EXISTS pos_attempts(request_key TEXT PRIMARY KEY,owner_id TEXT NOT NULL,payload TEXT NOT NULL,state TEXT NOT NULL,response TEXT,created_at INTEGER NOT NULL);PRAGMA user_version=1;`;
 const driverQueues = new WeakMap<SqlDriver, Promise<unknown>>();
 export class Outbox {
   constructor(
@@ -55,6 +59,54 @@ export class Outbox {
       );
       return key;
     });
+  }
+  pendingSale() {
+    return this.exclusive(
+      async () =>
+        (
+          await this.db.query<{ request_key: string; payload: string }>(
+            "SELECT request_key,payload FROM pos_attempts WHERE owner_id=? AND state='pending' ORDER BY created_at LIMIT 1",
+            [this.owner],
+          )
+        )[0] || null,
+    );
+  }
+  prepareSale(draft: OrderDraft & { cashReceived: number }) {
+    return this.exclusive(async () => {
+      const payload = JSON.stringify(saleDraftSchema.parse(draft));
+      const old = (
+        await this.db.query<{ request_key: string; payload: string }>(
+          "SELECT request_key,payload FROM pos_attempts WHERE owner_id=? AND state='pending' ORDER BY created_at LIMIT 1",
+          [this.owner],
+        )
+      )[0];
+      if (old) {
+        if (old.payload !== payload)
+          throw Error(
+            "Retoma primero la venta pendiente; no se cambia una solicitud sin resultado",
+          );
+        return old.request_key;
+      }
+      const key = crypto.randomUUID();
+      await this.db.run(
+        "INSERT INTO pos_attempts(request_key,owner_id,payload,state,created_at) VALUES(?,?,?,'pending',?)",
+        [key, this.owner, payload, Date.now()],
+      );
+      return key;
+    });
+  }
+  finishSale(key: string, response: unknown, rejected = false) {
+    return this.exclusive(() =>
+      this.db.run(
+        "UPDATE pos_attempts SET state=?,response=? WHERE request_key=? AND owner_id=? AND state='pending'",
+        [
+          rejected ? "rejected" : "completed",
+          JSON.stringify(response),
+          key,
+          this.owner,
+        ],
+      ),
+    );
   }
   list() {
     return this.exclusive(() =>

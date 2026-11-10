@@ -1,0 +1,5 @@
+ALTER TABLE orders ADD COLUMN channel text NOT NULL DEFAULT 'pickup' CHECK(channel IN ('pickup','pos'));
+CREATE TABLE inventory_audit(id bigserial PRIMARY KEY,actor_id text NOT NULL,kind text NOT NULL,entity_id text NOT NULL,before_data jsonb,after_data jsonb,reason text NOT NULL,created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE store_settings(singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),schedule jsonb NOT NULL,version integer NOT NULL DEFAULT 0);
+INSERT INTO store_settings(singleton,schedule) VALUES(true,'{"days":[{"closed":false,"open":"06:00","close":"21:00"},{"closed":false,"open":"06:00","close":"21:00"},{"closed":false,"open":"06:00","close":"21:00"},{"closed":false,"open":"06:00","close":"21:00"},{"closed":false,"open":"06:00","close":"21:00"},{"closed":false,"open":"06:00","close":"21:00"},{"closed":false,"open":"06:00","close":"21:00"}],"override":"auto","overrideDate":"2000-01-01"}');
+CREATE TABLE notification_reads(user_id text NOT NULL,event_id bigint NOT NULL REFERENCES events(id),read_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(user_id,event_id));

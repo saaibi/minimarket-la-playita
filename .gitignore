@@ -19,3 +19,5 @@ apps/web/ios/
 *.keystore
 coverage/
 .DS_Store
+# Private store photograph is supplied locally for the owner build, never public Git.
+apps/web/public/assets/tienda.jpg

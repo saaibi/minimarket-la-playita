@@ -2,6 +2,11 @@ import { z } from "zod";
 import {
   orderDraftSchema,
   actionSchema,
+  productWriteSchema,
+  stockAdjustmentSchema,
+  scheduleSchema,
+  saleDraftSchema,
+  clientWriteSchema,
 } from "../packages/shared/src/index.js";
 import { writeFile } from "node:fs/promises";
 const json = (schema: z.ZodType) => {
@@ -386,6 +391,180 @@ doc.paths["/auth/whatsapp/verify"] = {
     },
   },
 };
+Object.assign(contract.paths, {
+  "/inventory": {
+    ...contract.paths["/inventory"],
+    post: {
+      description:
+        "Solo admin. Alta de producto y presentaciones, existencias iniciales auditadas.",
+      parameters: [idempotency],
+      requestBody: {
+        required: true,
+        content: { "application/json": { schema: json(productWriteSchema) } },
+      },
+      responses: {
+        "201": { description: "Producto creado" },
+        "403": error,
+        "409": error,
+      },
+    },
+  },
+  "/inventory/{id}": {
+    put: {
+      description:
+        "Solo admin; versión obligatoria. Conserva snapshots de pedidos existentes.",
+      parameters: [
+        idempotency,
+        {
+          in: "path",
+          name: "id",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+        },
+      ],
+      requestBody: {
+        required: true,
+        content: { "application/json": { schema: json(productWriteSchema) } },
+      },
+      responses: {
+        "201": { description: "Producto actualizado" },
+        "403": error,
+        "409": error,
+      },
+    },
+  },
+  "/inventory/{id}/adjustments": {
+    post: {
+      description:
+        "Solo admin; delta y motivo auditados. Nunca reduce por debajo de reservas.",
+      parameters: [
+        idempotency,
+        {
+          in: "path",
+          name: "id",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+        },
+      ],
+      requestBody: {
+        required: true,
+        content: {
+          "application/json": { schema: json(stockAdjustmentSchema) },
+        },
+      },
+      responses: {
+        "201": { description: "Ajuste guardado" },
+        "403": error,
+        "409": error,
+      },
+    },
+  },
+  "/sales": {
+    post: {
+      description:
+        "Admin/vendedor. Venta POS en efectivo atómica: entregada y pagada, sin tocar reservas ajenas; misma clave para retries. Nequi no integrado.",
+      parameters: [idempotency],
+      requestBody: {
+        required: true,
+        content: { "application/json": { schema: json(saleDraftSchema) } },
+      },
+      responses: { "201": success, "403": error, "409": error },
+    },
+  },
+  "/settings": {
+    get: {
+      responses: {
+        "200": {
+          description:
+            "Horario Bogotá y versión; modo manual hasta volver a automático",
+        },
+      },
+    },
+    put: {
+      description:
+        "Solo admin; conflicto de versión protege cambios simultáneos.",
+      parameters: [idempotency],
+      requestBody: {
+        required: true,
+        content: { "application/json": { schema: json(scheduleSchema) } },
+      },
+      responses: {
+        "201": { description: "Horario guardado" },
+        "403": error,
+        "409": error,
+      },
+    },
+  },
+  "/audit": {
+    get: {
+      description:
+        "Solo admin. Últimos 200 movimientos/ediciones con responsable y antes/después.",
+      responses: { "200": { description: "Trazabilidad" }, "403": error },
+    },
+  },
+  "/notifications": {
+    get: {
+      description:
+        "Últimas 100 notificaciones. Comprador solo pedidos propios; lectura por identidad.",
+      responses: { "200": { description: "Notificaciones" } },
+    },
+  },
+  "/notifications/{id}/read": {
+    post: {
+      description:
+        "Marcar una notificación accesible como leída, sin marcar las demás.",
+      parameters: [
+        {
+          in: "path",
+          name: "id",
+          required: true,
+          schema: { type: "string", pattern: "^[0-9]+$" },
+        },
+      ],
+      responses: { "200": { description: "Lectura guardada" } },
+    },
+  },
+});
+Object.assign(contract.paths, {
+  "/clients": {
+    get: {
+      description: "Admin/vendedor; nunca comprador.",
+      responses: { "200": { description: "Clientes de tienda" }, "403": error },
+    },
+    post: {
+      description: "Solo admin; snapshots históricos no cambian.",
+      parameters: [idempotency],
+      requestBody: {
+        required: true,
+        content: { "application/json": { schema: json(clientWriteSchema) } },
+      },
+      responses: { "201": { description: "Cliente creado" }, "403": error },
+    },
+  },
+  "/clients/{id}": {
+    put: {
+      description: "Solo admin; versión protege ediciones simultáneas.",
+      parameters: [
+        idempotency,
+        {
+          in: "path",
+          name: "id",
+          required: true,
+          schema: { type: "string", format: "uuid" },
+        },
+      ],
+      requestBody: {
+        required: true,
+        content: { "application/json": { schema: json(clientWriteSchema) } },
+      },
+      responses: {
+        "201": { description: "Cliente actualizado" },
+        "403": error,
+        "409": error,
+      },
+    },
+  },
+});
 await writeFile(
   new URL("../docs/openapi.json", import.meta.url),
   JSON.stringify(contract, null, 2) + "\n",

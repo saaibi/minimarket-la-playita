@@ -11,6 +11,7 @@ import {
   Module,
   Inject,
   ServiceUnavailableException,
+  Put,
 } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { Pool } from "pg";
@@ -18,6 +19,14 @@ import { databaseOptions } from "./database-options.js";
 import { Server } from "socket.io";
 import { orderDraftSchema, actionSchema, type Actor } from "@playita/shared";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
+import {
+  productWriteSchema,
+  stockAdjustmentSchema,
+  scheduleSchema,
+  saleDraftSchema,
+  clientWriteSchema,
+} from "@playita/shared";
 import { Store } from "./store.js";
 import { AuthService, AuthError } from "./auth.js";
 import { type VerificationProvider } from "./verification.js";
@@ -34,7 +43,7 @@ class ApiController {
     try {
       const healthQuery = {
         text: "SELECT version FROM schema_migrations WHERE version = $1",
-        values: ["002_sessions.sql"],
+        values: ["004_catalog_details.sql"],
         query_timeout: 2500,
       };
       const result = await this.store.pool.query(healthQuery);
@@ -46,6 +55,134 @@ class ApiController {
   }
   @Get("inventory") inventory(@Req() req: Request) {
     return this.store.inventory(req.actor);
+  }
+  @Get("settings") settings() {
+    return this.store.settings();
+  }
+  @Get("clients") async clients(@Req() req: Request, @Res() res: any) {
+    if (req.actor.role === "buyer")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    return res.json(await this.store.clients());
+  }
+  @Post("clients") async createClient(
+    @Req() req: Request,
+    @Body() body: unknown,
+    @Res() res: any,
+  ) {
+    return this.manage(req, res, body, clientWriteSchema, (k, v) =>
+      this.store.saveClient(req.actor, k, randomUUID(), v, true),
+    );
+  }
+  @Put("clients/:id") async editClient(
+    @Req() req: Request,
+    @Body() body: unknown,
+    @Param("id") id: string,
+    @Res() res: any,
+  ) {
+    if (!z.uuid().safeParse(id).success)
+      return res.status(400).json({ code: "INVALID_ID" });
+    return this.manage(req, res, body, clientWriteSchema, (k, v) =>
+      this.store.saveClient(req.actor, k, id, v, false),
+    );
+  }
+  @Get("audit") async audit(@Req() req: Request, @Res() res: any) {
+    if (req.actor.role !== "admin")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    return res.json(await this.store.audits());
+  }
+  @Get("notifications") notifications(@Req() req: Request) {
+    return this.store.notifications(req.actor);
+  }
+  @Post("notifications/:id/read") async readNotification(
+    @Req() req: Request,
+    @Param("id") id: string,
+    @Res() res: any,
+  ) {
+    if (!/^(?:\d{1,18}|stock:[0-9a-f-]{36}:\d{1,10})$/.test(id))
+      return res.status(400).json({ code: "INVALID_ID" });
+    return res.json(await this.store.readNotification(req.actor, id));
+  }
+  @Put("settings") async settingsWrite(
+    @Req() req: Request,
+    @Body() body: unknown,
+    @Res() res: any,
+  ) {
+    return this.manage(req, res, body, scheduleSchema, (k, v) =>
+      this.store.saveSettings(req.actor, k, v),
+    );
+  }
+  @Post("inventory") async productCreate(
+    @Req() req: Request,
+    @Body() body: unknown,
+    @Res() res: any,
+  ) {
+    return this.manage(req, res, body, productWriteSchema, (k, v) =>
+      this.store.saveProduct(req.actor, k, randomUUID(), v, true),
+    );
+  }
+  @Put("inventory/:id") async productUpdate(
+    @Req() req: Request,
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @Res() res: any,
+  ) {
+    if (!z.uuid().safeParse(id).success)
+      return res.status(400).json({ code: "INVALID_ID" });
+    return this.manage(req, res, body, productWriteSchema, (k, v) =>
+      this.store.saveProduct(req.actor, k, id, v, false),
+    );
+  }
+  @Post("inventory/:id/adjustments") async adjust(
+    @Req() req: Request,
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @Res() res: any,
+  ) {
+    if (!z.uuid().safeParse(id).success)
+      return res.status(400).json({ code: "INVALID_ID" });
+    return this.manage(req, res, body, stockAdjustmentSchema, (k, v) =>
+      this.store.adjustStock(req.actor, k, id, v),
+    );
+  }
+  private async manage<T>(
+    req: Request,
+    res: any,
+    body: unknown,
+    schema: z.ZodType<T>,
+    run: (key: string, value: T) => Promise<any>,
+  ) {
+    if (req.actor.role !== "admin")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    const parsed = schema.safeParse(body),
+      id = key(req);
+    if (!parsed.success || !id.success)
+      return res.status(400).json({ code: "VALIDATION_ERROR" });
+    const result = await run(id.data, parsed.data);
+    res.setHeader("Idempotency-Replayed", String(!!result.replayed));
+    return res.status(result.status).json(result.body);
+  }
+  @Post("sales") async sale(
+    @Req() req: Request,
+    @Body() body: unknown,
+    @Res() res: any,
+  ) {
+    if (req.actor.role === "buyer")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    const parsed = saleDraftSchema.safeParse(body),
+      id = key(req);
+    if (!parsed.success || !id.success)
+      return res.status(400).json({ code: "VALIDATION_ERROR" });
+    if (parsed.data.paymentMethod !== "cash")
+      return res.status(409).json({ code: "PAYMENT_NOT_INTEGRATED" });
+    const result = await this.store.create(
+      req.actor,
+      id.data,
+      parsed.data,
+      true,
+      parsed.data.cashReceived,
+    );
+    res.setHeader("Idempotency-Replayed", String(!!result.replayed));
+    return res.status(result.status).json(result.body);
   }
   @Get("orders") orders(@Req() req: Request) {
     return this.store.list(req.actor);
@@ -160,7 +297,7 @@ export async function createApp(config: {
   )
     throw Error("Production requires explicit HTTPS CORS allowlist");
   app.enableCors({ origin: origins, credentials: true });
-  app.use(json({ limit: "64kb" }));
+  app.use(json({ limit: "512kb" }));
   const auth = new AuthService(
     pool,
     origins,

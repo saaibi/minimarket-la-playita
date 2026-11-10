@@ -6,7 +6,7 @@ export const native = Capacitor.isNativePlatform();
 const configuredApi = import.meta.env?.VITE_API_URL || "";
 export const base = native
   ? nativeApiUrl(configuredApi)
-  : configuredApi || "http://127.0.0.1:4300";
+  : configuredApi || "/api";
 export const backendConfigured = !native || !!base;
 let logoutPending = false;
 export const auth = new SessionClient({

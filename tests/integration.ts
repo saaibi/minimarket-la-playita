@@ -1,4 +1,5 @@
 import test from "node:test";
+import { bogotaDate } from "@playita/shared";
 import assert from "node:assert/strict";
 import { Pool } from "pg";
 import { bootstrapAdmin } from "../apps/api/src/auth.js";
@@ -30,6 +31,12 @@ test(
     let server: Awaited<ReturnType<typeof createApp>> | undefined;
     try {
       await migrate(url.toString());
+      const settingsPool = new Pool({ connectionString: url.toString() });
+      await settingsPool.query(
+        "UPDATE store_settings SET schedule=schedule || $1::jsonb",
+        [JSON.stringify({ override: "open", overrideDate: bogotaDate() })],
+      );
+      await settingsPool.end();
       server = await createApp({ databaseUrl: url.toString() });
       await bootstrapAdmin(server.pool, "admin@example.invalid", password);
       await server.app.listen(0, "127.0.0.1");

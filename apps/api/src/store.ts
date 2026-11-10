@@ -6,6 +6,10 @@ import {
   canonical,
   type Actor,
   type OrderDraft,
+  type ProductWrite,
+  type Schedule,
+  isStoreOpen,
+  bogotaDate,
 } from "@playita/shared";
 export type Reply = {
   status: number;
@@ -28,7 +32,7 @@ export class Store {
   ) {}
   async inventory(actor: Actor) {
     const { rows } = await this.pool.query(
-      `SELECT id,name,kind,price_cop AS "priceCop",stock,reserved,stock-reserved AS available,version${actor.role === "admin" ? ',cost_cop AS "costCop"' : ""} FROM products ${actor.role === "buyer" ? "WHERE visible" : ""} ORDER BY name`,
+      `SELECT id,name,kind,price_cop AS "priceCop",stock,reserved,stock-reserved AS available,version,minimum,visible,category,code,description,photo${actor.role === "admin" ? ',cost_cop AS "costCop",supplier' : ""} FROM products ${actor.role === "buyer" ? "WHERE visible" : ""} ORDER BY name`,
     );
     for (const p of rows)
       p.presentations = (
@@ -49,7 +53,7 @@ export class Store {
   async get(actor: Actor, id: string, db: Pool | PoolClient = this.pool) {
     const row = (
       await db.query(
-        'SELECT id,owner_id AS "ownerId",status,payment_method AS "paymentMethod",payment_status AS "paymentStatus",client_name AS "clientName",client_reference AS "clientReference",total_cop AS "totalCop",created_at AS "createdAt" FROM orders WHERE id=$1',
+        'SELECT id,owner_id AS "ownerId",status,payment_method AS "paymentMethod",payment_status AS "paymentStatus",client_name AS "clientName",client_reference AS "clientReference",total_cop AS "totalCop",created_at AS "createdAt",channel,cash_received AS "cashReceived",cash_change AS "cashChange" FROM orders WHERE id=$1',
         [id],
       )
     ).rows[0];
@@ -145,12 +149,27 @@ export class Store {
     ).rows[0];
     events.push(e);
   }
-  create(actor: Actor, key: string, draft: OrderDraft) {
+  create(
+    actor: Actor,
+    key: string,
+    draft: OrderDraft,
+    sale = false,
+    cashReceived?: number,
+  ) {
     return this.once(
       actor,
       key,
-      { operation: "create-order", draft },
+      {
+        operation: sale ? "create-sale" : "create-order",
+        draft,
+        ...(sale ? { cashReceived } : {}),
+      },
       async (db, events) => {
+        if (sale && (actor.role === "buyer" || draft.paymentMethod !== "cash"))
+          throw new Conflict(
+            "POS_NOT_ALLOWED",
+            "Venta directa solo personal y efectivo confirmado",
+          );
         const ids = [...new Set(draft.lines.map((l) => l.productId))].sort(),
           products = (
             await db.query(
@@ -223,18 +242,30 @@ export class Store {
               { productId: id, needed, available: p.stock - p.reserved },
             );
         }
+        if (sale && (cashReceived === undefined || cashReceived < total))
+          throw new Conflict(
+            "INSUFFICIENT_CASH",
+            "El efectivo recibido no cubre el total",
+          );
         const id = randomUUID();
         await db.query(
-          "INSERT INTO orders(id,owner_id,status,payment_method,payment_status,client_name,client_reference,total_cop) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
+          "INSERT INTO orders(id,owner_id,status,payment_method,payment_status,client_name,client_reference,total_cop,channel,cash_received,cash_change) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
           [
             id,
             actor.id,
-            "confirmed",
+            sale ? "delivered" : "confirmed",
             draft.paymentMethod,
-            draft.paymentMethod === "nequi" ? "not_integrated" : "pending",
+            sale
+              ? "paid"
+              : draft.paymentMethod === "nequi"
+                ? "not_integrated"
+                : "pending",
             draft.client?.name || "Cliente general",
             draft.client?.reference || "",
             total,
+            sale ? "pos" : "pickup",
+            sale ? cashReceived : null,
+            sale ? cashReceived! - total : null,
           ],
         );
         for (const { p, v, l, base, linePrice, price } of lines)
@@ -254,14 +285,33 @@ export class Store {
               linePrice,
             ],
           );
-        for (const [id, needed] of needs)
+        for (const [productId, needed] of needs) {
           await db.query(
-            "UPDATE products SET reserved=reserved+$2,version=version+1 WHERE id=$1",
-            [id, needed],
+            sale
+              ? "UPDATE products SET stock=stock-$2,version=version+1 WHERE id=$1"
+              : "UPDATE products SET reserved=reserved+$2,version=version+1 WHERE id=$1",
+            [productId, needed],
           );
-        await this.event(db, events, "order.confirmed", actor.id, {
-          orderId: id,
-        });
+          if (sale)
+            await this.audit(
+              db,
+              actor,
+              "sale",
+              productId,
+              products.find((p) => p.id === productId),
+              { deducted: needed, orderId: id },
+              "Venta POS en efectivo",
+            );
+        }
+        await this.event(
+          db,
+          events,
+          sale ? "order.delivered" : "order.confirmed",
+          actor.id,
+          {
+            orderId: id,
+          },
+        );
         await this.event(db, events, "inventory.changed", null, {
           productIds: ids,
         });
@@ -333,11 +383,21 @@ export class Store {
             "SELECT id FROM products WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE",
             [lines.map((l) => l.product_id)],
           );
-          for (const l of lines)
+          for (const l of lines) {
+            await this.audit(
+              db,
+              actor,
+              status,
+              l.product_id,
+              null,
+              { orderId: id, quantity: l.qty },
+              "Cierre de pedido",
+            );
             await db.query(
               "UPDATE products SET reserved=reserved-$2,stock=stock-$3,version=version+1 WHERE id=$1",
               [l.product_id, l.qty, status === "delivered" ? l.qty : 0],
             );
+          }
           await this.event(db, events, "inventory.changed", null, {
             productIds: lines.map((l) => l.product_id),
           });
@@ -352,6 +412,337 @@ export class Store {
         return (await this.get(actor, id, db))!;
       },
     );
+  }
+  private async audit(
+    db: PoolClient,
+    actor: Actor,
+    kind: string,
+    entity: string,
+    before: unknown,
+    after: unknown,
+    reason: string,
+  ) {
+    await db.query(
+      "INSERT INTO inventory_audit(actor_id,kind,entity_id,before_data,after_data,reason) VALUES($1,$2,$3,$4,$5,$6)",
+      [
+        actor.id,
+        kind,
+        entity,
+        JSON.stringify(before),
+        JSON.stringify(after),
+        reason,
+      ],
+    );
+  }
+  async clients() {
+    return (
+      await this.pool.query(
+        "SELECT id,name,contact,version FROM clients ORDER BY name",
+      )
+    ).rows;
+  }
+  saveClient(
+    actor: Actor,
+    key: string,
+    id: string,
+    input: { name: string; contact: string; version?: number },
+    create: boolean,
+  ) {
+    return this.once(
+      actor,
+      key,
+      { operation: "client", id: create ? null : id, input },
+      async (db, events) => {
+        if (actor.role !== "admin")
+          throw new Conflict("FORBIDDEN", "Solo administrador");
+        const old = (
+          await db.query("SELECT * FROM clients WHERE id=$1 FOR UPDATE", [id])
+        ).rows[0];
+        if (!create && (!old || old.version !== input.version))
+          throw new Conflict(
+            "VERSION_CONFLICT",
+            "El cliente cambió; vuelve a consultarlo",
+          );
+        if (create)
+          await db.query(
+            "INSERT INTO clients(id,name,contact) VALUES($1,$2,$3)",
+            [id, input.name, input.contact],
+          );
+        else
+          await db.query(
+            "UPDATE clients SET name=$2,contact=$3,version=version+1 WHERE id=$1",
+            [id, input.name, input.contact],
+          );
+        await this.audit(
+          db,
+          actor,
+          "client.updated",
+          id,
+          old,
+          input,
+          "Cliente actualizado; ventas previas conservan snapshot",
+        );
+        return { id };
+      },
+    );
+  }
+
+  async audits() {
+    return (
+      await this.pool.query(
+        'SELECT id,actor_id AS "actorId",kind,entity_id AS "entityId",before_data AS before,after_data AS after,reason,created_at AS "createdAt" FROM inventory_audit ORDER BY id DESC LIMIT 200',
+      )
+    ).rows;
+  }
+  async settings(): Promise<Schedule> {
+    const row = (
+      await this.pool.query(
+        "SELECT schedule,version FROM store_settings WHERE singleton",
+      )
+    ).rows[0];
+    return { ...row.schedule, version: row.version };
+  }
+  saveSettings(actor: Actor, key: string, input: Schedule) {
+    return this.once(
+      actor,
+      key,
+      { operation: "settings", input },
+      async (db, events) => {
+        if (actor.role !== "admin")
+          throw new Conflict("FORBIDDEN", "Solo administrador");
+        const old = (
+          await db.query(
+            "SELECT schedule,version FROM store_settings WHERE singleton FOR UPDATE",
+          )
+        ).rows[0];
+        if (old.version !== input.version)
+          throw new Conflict(
+            "VERSION_CONFLICT",
+            "El horario cambió; vuelve a consultarlo",
+          );
+        const next = { ...input, overrideDate: bogotaDate() };
+        delete (next as Partial<Schedule>).version;
+        await db.query(
+          "UPDATE store_settings SET schedule=$1,version=version+1 WHERE singleton",
+          [JSON.stringify(next)],
+        );
+        await this.audit(
+          db,
+          actor,
+          "schedule",
+          "store",
+          old.schedule,
+          next,
+          "Actualización de horario",
+        );
+        await this.event(db, events, "store.changed", null, {});
+        return { ...next, version: old.version + 1 };
+      },
+    );
+  }
+  saveProduct(
+    actor: Actor,
+    key: string,
+    id: string,
+    input: ProductWrite,
+    create: boolean,
+  ) {
+    return this.once(
+      actor,
+      key,
+      { operation: "save-product", id: create ? null : id, input },
+      async (db, events) => {
+        if (actor.role !== "admin")
+          throw new Conflict("FORBIDDEN", "Solo administrador");
+        const old = (
+          await db.query("SELECT * FROM products WHERE id=$1 FOR UPDATE", [id])
+        ).rows[0];
+        if (!create && (!old || old.version !== input.version))
+          throw new Conflict(
+            "VERSION_CONFLICT",
+            "El producto cambió; actualiza el inventario",
+          );
+        if (old && old.kind !== input.kind)
+          throw new Conflict(
+            "KIND_IMMUTABLE",
+            "El tipo de producto no puede cambiar",
+          );
+        if (!create && input.initialStock !== undefined)
+          throw new Conflict(
+            "USE_ADJUSTMENT",
+            "Usa ajuste de existencias con motivo",
+          );
+        const price =
+          input.kind === "unit"
+            ? input.presentations.find((v) => v.factor === 1)!.priceCop
+            : input.priceCop;
+        if (create)
+          await db.query(
+            "INSERT INTO products(id,name,kind,price_cop,cost_cop,stock,minimum,visible) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
+            [
+              id,
+              input.name,
+              input.kind,
+              price,
+              input.costCop,
+              input.initialStock || 0,
+              input.minimum,
+              input.visible,
+            ],
+          );
+        else
+          await db.query(
+            "UPDATE products SET name=$2,price_cop=$3,cost_cop=$4,minimum=$5,visible=$6,version=version+1 WHERE id=$1",
+            [
+              id,
+              input.name,
+              price,
+              input.costCop,
+              input.minimum,
+              input.visible,
+            ],
+          );
+        await db.query(
+          "UPDATE products SET category=$2,code=$3,supplier=$4,description=$5,photo=$6 WHERE id=$1",
+          [
+            id,
+            input.category,
+            input.code,
+            input.supplier,
+            input.description,
+            input.photo,
+          ],
+        );
+        const oldPresentations = (
+          await db.query("SELECT * FROM presentations WHERE product_id=$1", [
+            id,
+          ])
+        ).rows;
+        const owned = new Set(oldPresentations.map((p) => p.id));
+        for (const v of input.presentations)
+          if (v.id && !owned.has(v.id))
+            throw new Conflict(
+              "INVALID_PRESENTATION",
+              "Presentación ajena al producto",
+            );
+        await db.query("DELETE FROM presentations WHERE product_id=$1", [id]);
+        for (const v of input.presentations)
+          await db.query(
+            "INSERT INTO presentations(id,product_id,name,factor,price_cop,is_base) VALUES($1,$2,$3,$4,$5,$6)",
+            [
+              v.id || randomUUID(),
+              id,
+              v.name,
+              v.factor,
+              v.priceCop,
+              v.factor === 1,
+            ],
+          );
+        await this.audit(
+          db,
+          actor,
+          create ? "product.created" : "product.updated",
+          id,
+          old
+            ? {
+                ...old,
+                photo: old.photo ? "Imagen configurada" : "",
+                presentations: oldPresentations,
+              }
+            : null,
+          { ...input, photo: input.photo ? "Imagen configurada" : "" },
+          create ? "Alta de producto" : "Edición de producto",
+        );
+        await this.event(db, events, "inventory.changed", null, {
+          productIds: [id],
+        });
+        return { id };
+      },
+    );
+  }
+  adjustStock(
+    actor: Actor,
+    key: string,
+    id: string,
+    input: { delta: number; reason: string; version: number },
+  ) {
+    return this.once(
+      actor,
+      key,
+      { operation: "stock-adjustment", id, input },
+      async (db, events) => {
+        if (actor.role !== "admin")
+          throw new Conflict("FORBIDDEN", "Solo administrador");
+        const old = (
+          await db.query("SELECT * FROM products WHERE id=$1 FOR UPDATE", [id])
+        ).rows[0];
+        if (!old || old.version !== input.version)
+          throw new Conflict(
+            "VERSION_CONFLICT",
+            "El producto cambió; actualiza antes de ajustar",
+          );
+        const stock = old.stock + input.delta;
+        if (
+          !Number.isSafeInteger(stock) ||
+          stock < old.reserved ||
+          stock > 100000000
+        )
+          throw new Conflict(
+            "RESERVED_STOCK",
+            "Las existencias no pueden quedar por debajo de lo reservado",
+          );
+        await db.query(
+          "UPDATE products SET stock=$2,version=version+1 WHERE id=$1",
+          [id, stock],
+        );
+        await this.audit(
+          db,
+          actor,
+          "stock.adjusted",
+          id,
+          { stock: old.stock, reserved: old.reserved },
+          { stock, delta: input.delta },
+          input.reason,
+        );
+        await this.event(db, events, "inventory.changed", null, {
+          productIds: [id],
+        });
+        return { id, stock };
+      },
+    );
+  }
+  async notifications(actor: Actor) {
+    const rows = (
+      await this.pool.query(
+        `SELECT e.id::text,e.kind,e.payload,e.created_at AS "createdAt",(r.event_id IS NOT NULL) AS read FROM events e LEFT JOIN notification_reads r ON r.event_id=e.id AND r.user_id=$1 WHERE e.kind LIKE 'order.%' ${actor.role === "buyer" ? "AND e.owner_id=$1" : ""} ORDER BY e.id DESC LIMIT 100`,
+        [actor.id],
+      )
+    ).rows;
+    if (actor.role !== "buyer") {
+      const alerts = (
+        await this.pool.query(
+          `SELECT 'stock:'||p.id||':'||p.version AS id,'inventory.changed' AS kind,json_build_object('productId',p.id,'name',p.name,'available',p.stock-p.reserved,'minimum',p.minimum,'kind',p.kind) AS payload,now() AS "createdAt",(r.product_id IS NOT NULL) AS read FROM products p LEFT JOIN inventory_notice_reads r ON r.product_id=p.id AND r.version=p.version AND r.user_id=$1 WHERE p.stock-p.reserved<=p.minimum ORDER BY p.name`,
+          [actor.id],
+        )
+      ).rows;
+      rows.push(...alerts);
+    }
+    return rows;
+  }
+  async readNotification(actor: Actor, id: string) {
+    if (id.startsWith("stock:")) {
+      if (actor.role === "buyer") return { ok: false };
+      const [, productId, version] = id.split(":");
+      await this.pool.query(
+        `INSERT INTO inventory_notice_reads(user_id,product_id,version) SELECT $1,id,version FROM products WHERE id=$2 AND version=$3 AND stock-reserved<=minimum ON CONFLICT DO NOTHING`,
+        [actor.id, productId, Number(version)],
+      );
+    } else
+      await this.pool.query(
+        `INSERT INTO notification_reads(user_id,event_id) SELECT $1,id FROM events WHERE id=$2 ${actor.role === "buyer" ? "AND owner_id=$1" : ""} ON CONFLICT DO NOTHING`,
+        [actor.id, id],
+      );
+    return { ok: true };
   }
   async events(actor: Actor, after: string) {
     return (

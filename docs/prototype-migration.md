@@ -1,0 +1,15 @@
+# Prototipo → app React/Capacitor
+
+Referencia: prototipo local aprobado, conservado sin alteración. La aplicación implementa login y roles reales; no importa cuentas demo, selector de privilegios ni datos de localStorage del prototipo.
+
+Navegación: Inventario, Caja, Pedidos, Ventas y Ajustes (solo admin). Comprador: Catálogo y Mis pedidos. Campana con Inventario/Pedidos, entrada por defecto Pedidos; lectura individual o por sección. Canasta en encabezado para todos, resumen expandible, una columna y navegación inferior en móvil. Marca elegida en login/encabezado y launcher/splash Android.
+
+Backend: migraciones aditivas 003/004. Productos editables, categorías/código/proveedor/descripcion/foto comprimida, presentaciones con base individual y precios independientes (15/30 comparten stock). Costos y escritura solo admin, controles de versión, ajustes con motivo, auditoría. Clientes admin editables y consulta staff, snapshots de ventas inmutables. POS efectivo recibido/cambio y descuento atómico sin consumir reservas ajenas, idempotencia y recuperación de intento pendiente en SQLite nativo. Pedidos con acciones por rol, ventas solo entregadas/pagadas. Horarios semanales Bogotá con ventana nocturna y modo manual hasta volver a automático, informativo como el prototipo; no bloquea reservas por sí solo.
+
+El frontend local de desarrollo usa el mismo backend Render activo mediante un proxy exclusivamente loopback; valida origen y mantiene TLS aguas arriba. Cookies de desarrollo solo en loopback (HttpOnly/SameSite), sin tokens localStorage; las cookies de producción continúan Secure. La APK usa HTTPS directo. El sitio frontend no se ha publicado: 5173 es desarrollo local; 4173 sigue siendo la referencia demo separada.
+
+Reapertura: restauración completa con plazo y recuperación visible, lectura de almacenamiento nativo acotada, no escribe una cola de logout vacía al arrancar y procesa revocaciones pendientes por lotes; invalidación de respuestas tardías conserva aislamiento. No elimina sesión/cola ni inventa autenticación si falla la red. Se retiró el enlace redundante de login que regresaba a la misma ruta protegida.
+
+Diferencias deliberadas de seguridad: no admin/admin, cambio de rol demo, reset de datos ni confirmación Nequi simulada en la aplicación conectada. Google/Apple/Nequi no integrados. La fotografía privada de la tienda se incluye solo en el entorno local/APK del propietario, excluida de Git público. Fotos de productos nuevas quedan en PostgreSQL, nunca en el repositorio. Límites UI actuales: pedidos/ventas últimos 100, notificaciones últimos 100, auditoría últimos 200. No hay devoluciones de ventas cobradas ni notificaciones push. No se ha probado en teléfono físico ni iOS.
+
+Construcción: instalar Pillow solo en .runtime/brand-venv y ejecutar scripts/android-debug.sh con VITE_API_URL del backend y PLAYITA_ANDROID_VERSION_NAME/PLAYITA_ANDROID_VERSION_CODE crecientes. Mantener la misma clave debug local para actualizar sin desinstalar ni borrar pendientes. El generador determinista usa únicamente la marca aprobada.

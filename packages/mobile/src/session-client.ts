@@ -33,6 +33,7 @@ export class SessionClient {
       mode: "web" | "native";
       vault?: SecretVault;
       fetch?: typeof fetch;
+      restoreTimeoutMs?: number;
       csrf?: () => string;
       lock?: <T>(fn: () => Promise<T>) => Promise<T>;
       intent?: { get(): boolean; set(value: boolean): void };
@@ -126,14 +127,46 @@ export class SessionClient {
     return this.accept(data, generation);
   }
   async restore() {
+    const generation = this.generation;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new SessionError(503, "RESTORE_TIMEOUT")),
+        this.config.restoreTimeoutMs ?? 15000,
+      );
+    });
+    try {
+      return await Promise.race([this.restoreInner(generation), timeout]);
+    } catch (e) {
+      if (
+        e instanceof SessionError &&
+        e.code === "RESTORE_TIMEOUT" &&
+        generation === this.generation
+      ) {
+        this.generation++;
+        this.refreshing = null;
+      }
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  private async restoreInner(generation: number) {
+    const ensure = () => {
+      if (generation !== this.generation)
+        throw new SessionError(401, "SESSION_CHANGED");
+    };
     await this.flushLogout();
+    ensure();
     if (this.config.mode === "web" && this.config.intent?.get()) return null;
     if (this.config.mode === "native") {
       const record = await this.saved();
+      ensure();
       if (!record) return null;
       try {
         return await this.refresh();
       } catch (e) {
+        ensure();
         this.access = "";
         if (e instanceof SessionError) {
           await this.config.vault!.set(
@@ -147,6 +180,7 @@ export class SessionClient {
     }
     try {
       const data = await this.raw("/auth/me");
+      ensure();
       this.set({ ...data, mode: "authenticated" });
       return this.current;
     } catch (e) {
@@ -186,7 +220,7 @@ export class SessionClient {
         throw new SessionError(401, "ACCOUNT_MISMATCH");
       return this.accept(data, generation);
     };
-    this.refreshing = (this.config.lock ? this.config.lock(fn) : fn())
+    const pending = (this.config.lock ? this.config.lock(fn) : fn())
       .catch((e) => {
         if (generation === this.generation && e instanceof SessionError) {
           this.access = "";
@@ -199,9 +233,10 @@ export class SessionClient {
         throw e;
       })
       .finally(() => {
-        this.refreshing = null;
+        if (this.refreshing === pending) this.refreshing = null;
       });
-    return this.refreshing;
+    this.refreshing = pending;
+    return pending;
   }
   async request(path: string, init: RequestInit = {}, expectedOwner?: string) {
     const generation = this.generation,
@@ -314,14 +349,18 @@ export class SessionClient {
         (await this.config.vault?.get("logout_pending")) || "[]",
       ) as string[],
       remaining: string[] = [];
-    for (const refreshToken of pending) {
-      try {
-        await this.raw("/auth/logout", { refreshToken });
-      } catch (e) {
-        if (!(e instanceof SessionError && e.status === 401))
-          remaining.push(refreshToken);
-      }
-    }
+    if (!pending.length) return;
+    remaining.push(...pending.slice(3));
+    await Promise.all(
+      pending.slice(0, 3).map(async (refreshToken) => {
+        try {
+          await this.raw("/auth/logout", { refreshToken });
+        } catch (e) {
+          if (!(e instanceof SessionError && e.status === 401))
+            remaining.push(refreshToken);
+        }
+      }),
+    );
     if (this.config.vault)
       await this.config.vault.set("logout_pending", JSON.stringify(remaining));
   }

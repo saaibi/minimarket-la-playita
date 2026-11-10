@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { auth, useSession } from "./session.js";
 type Staff = { id: string; email: string; role: string; active: boolean };
-export function StaffUsers() {
+export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
   const session = useSession()!,
     [users, setUsers] = useState<Staff[]>([]),
     [email, setEmail] = useState(""),
@@ -21,9 +21,9 @@ export function StaffUsers() {
     );
   }, []);
   return (
-    <main>
-      <Link to="/app">← Volver a tienda</Link>
-      <h1>Personal de la tienda</h1>
+    <section className="staff-users">
+      {!embedded && <Link to="/app">← Volver a tienda</Link>}
+      <h2>Personal de la tienda</h2>
       <p>Solo administrador. No hay registro público de personal.</p>
       <section className="panel">
         <h2>Crear cuenta</h2>
@@ -118,6 +118,6 @@ export function StaffUsers() {
         ))}
       </section>
       <p role="status">{message}</p>
-    </main>
+    </section>
   );
 }
