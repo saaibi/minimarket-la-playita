@@ -69,7 +69,7 @@ const day = z
   .strict()
   .refine(
     (d) => d.closed || d.open !== d.close,
-    "El cierre debe ser posterior a la apertura",
+    "Apertura y cierre no pueden coincidir; cierre anterior corresponde al día siguiente",
   );
 export const scheduleSchema = z
   .object({

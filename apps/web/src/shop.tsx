@@ -524,6 +524,16 @@ export function Shop() {
                 })}{" "}
                 · {n.read ? "Leída" : "Sin leer"}
               </small>
+              {n.kind === "inventory.changed" && (
+                <span>
+                  {n.payload.name}
+                  <small>
+                    {n.payload.available} disponibles · Mínimo{" "}
+                    {n.payload.minimum}{" "}
+                    {n.payload.kind === "weight" ? "g" : "unidades"}
+                  </small>
+                </span>
+              )}
               <span>
                 {n.payload.orderId
                   ? "Ver pedido y acciones"
@@ -684,26 +694,13 @@ export function Shop() {
           </div>
         </header>
         <div className="environment-banner">
-          ENTORNO DE PRUEBAS · Productos y precios de ejemplo · Sin pagos
-          electrónicos integrados
+          RECOGIDA EN TIENDA · COP · Una libra = 500 g
         </div>
         {cart.length > 0 && (
           <div className="cart-dock">
             <span>
               {cart.length} líneas en la canasta <strong>{money(total)}</strong>
             </span>
-            <select
-              aria-label="Categoría"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            >
-              <option value="all">Todas las categorías</option>
-              {[...new Set(products.map((p) => p.category || "Despensa"))].map(
-                (c) => (
-                  <option key={c}>{c}</option>
-                ),
-              )}
-            </select>
             <button onClick={() => setCartOpen(true)}>Ver canasta</button>
           </div>
         )}
