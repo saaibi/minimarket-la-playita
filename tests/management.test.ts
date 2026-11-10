@@ -22,6 +22,11 @@ test("horarios Bogotá, modo manual y ventana nocturna y presentación base requ
   assert.equal(isStoreOpen(schedule, new Date("2026-11-10T02:00:00Z")), false);
   assert.equal(bogotaDate(new Date("2026-11-10T04:59:00Z")), "2026-11-09");
   assert.equal(isStoreOpen(schedule, new Date("2026-11-10T12:00:00Z")), false);
+  schedule.override = "auto";
+  schedule.days[1] = { closed: false, open: "22:00", close: "02:00" };
+  assert.equal(isStoreOpen(schedule, new Date("2026-11-10T04:00:00Z")), true);
+  assert.equal(isStoreOpen(schedule, new Date("2026-11-10T06:00:00Z")), true);
+  assert.equal(isStoreOpen(schedule, new Date("2026-11-10T08:00:00Z")), false);
   assert.equal(
     productWriteSchema.safeParse({
       name: "Huevos",

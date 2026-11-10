@@ -658,8 +658,11 @@ export function Settings({
 }) {
   const [draft, setDraft] = useState<Schedule | null>(schedule),
     [message, setMessage] = useState(""),
-    [busy, setBusy] = useState(false);
-  useEffect(() => setDraft(schedule), [schedule]);
+    [busy, setBusy] = useState(false),
+    [dirty, setDirty] = useState(false);
+  useEffect(() => {
+    if (!dirty) setDraft(schedule);
+  }, [schedule, dirty]);
   return (
     <>
       <div className="heading">
@@ -677,6 +680,7 @@ export function Settings({
             existentes se pueden gestionar con la tienda cerrada.
           </p>
           <form
+            onChange={() => setDirty(true)}
             onSubmit={(e) => {
               e.preventDefault();
               setBusy(true);
@@ -685,14 +689,17 @@ export function Settings({
                 headers: { "Idempotency-Key": crypto.randomUUID() },
                 body: JSON.stringify({ ...draft, overrideDate: bogotaDate() }),
               })
-                .then(reload)
+                .then(() => {
+                  setDirty(false);
+                  return reload();
+                })
                 .then(() => setMessage("Horario guardado"))
                 .catch((e) => setMessage(String(e)))
                 .finally(() => setBusy(false));
             }}
           >
             <label>
-              Atención de hoy
+              Modo de atención
               <select
                 value={draft.override}
                 onChange={(e) =>
@@ -795,7 +802,19 @@ export function Settings({
           </form>
         </section>
       ) : (
-        <p>No fue posible consultar el horario.</p>
+        <section className="panel">
+          <p>No fue posible consultar el horario.</p>
+          <button
+            onClick={() =>
+              void reload().catch(() =>
+                setMessage("La tienda no respondió. Reintenta en un momento."),
+              )
+            }
+          >
+            Volver a consultar horario
+          </button>
+          <p role="alert">{message}</p>
+        </section>
       )}
       <StaffUsers embedded />
       <Clients api={api} reload={reload} />
