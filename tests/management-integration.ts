@@ -218,6 +218,7 @@ test(
           await req("/sales", seller, "POST", {
             ...draft,
             paymentMethod: "nequi",
+            cashReceived: 15000,
           })
         ).status,
         409,
