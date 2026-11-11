@@ -128,7 +128,14 @@ export function Shop() {
     setSchedule(config);
     setNotices(ns);
     if (staff) setClients(await request("/clients"));
-    await box.current?.saveCatalog(list);
+    // A cache write failure must not turn an accepted server action into an error.
+    try {
+      await box.current?.saveCatalog(list);
+    } catch {
+      setMessage(
+        "La tienda está actualizada; no se pudo guardar la copia sin conexión.",
+      );
+    }
   }
   useEffect(() => {
     let active = true,
@@ -156,10 +163,17 @@ export function Shop() {
           setNotices(ns);
           if (staff) setClients(await request("/clients"));
           setMessage("Información actualizada de la tienda");
-          await ownBox?.saveCatalog(list);
+          try {
+            await ownBox?.saveCatalog(list);
+          } catch {
+            if (active)
+              setMessage(
+                "La tienda está actualizada; no se pudo guardar la copia sin conexión.",
+              );
+          }
         }
       } catch {
-        const cached = await ownBox?.catalog();
+        const cached = await ownBox?.catalog().catch(() => null);
         if (active) {
           if (cached)
             setProducts(
@@ -693,9 +707,7 @@ export function Shop() {
             <button onClick={() => void logout()}>Salir</button>
           </div>
         </header>
-        <div className="environment-banner">
-          RECOGIDA EN TIENDA · COP
-        </div>
+        <div className="environment-banner">RECOGIDA EN TIENDA · COP</div>
         {cart.length > 0 && (
           <div className="cart-dock">
             <span>

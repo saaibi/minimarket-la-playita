@@ -255,3 +255,37 @@ test("Google nativo: challenge, token solo al servidor y sesión en vault; cance
   assert.ok(saved?.includes("refresh-test"));
   assert.equal(saved?.includes("google-id-token-test"), false);
 });
+test("Google preparado: no permite completar un challenge después de cambiar sesión", async () => {
+  const requests: string[] = [];
+  const client = new SessionClient({
+    base: "https://api.example.invalid",
+    mode: "web",
+    fetch: async (input) => {
+      const path = String(input);
+      requests.push(path);
+      if (path.endsWith("/challenge"))
+        return Response.json({
+          challengeId: "test",
+          nonce: "nonce",
+          clientId: "test.apps.googleusercontent.com",
+        });
+      if (path.endsWith("/auth/guest"))
+        return Response.json({
+          actor: actor("different-owner"),
+          accessExpiresAt: Date.now() + 300000,
+        });
+      throw Error("unexpected path");
+    },
+  });
+  const challenge = await client.prepareGoogle();
+  await client.guest();
+  await assert.rejects(
+    client.completeGoogle(challenge, "synthetic-token"),
+    (e: unknown) => e instanceof SessionError && e.code === "SESSION_CHANGED",
+  );
+  assert.equal(
+    requests.some((p) => p.endsWith("/verify")),
+    false,
+  );
+  assert.equal(client.current!.actor.id, "different-owner");
+});

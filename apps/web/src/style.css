@@ -947,3 +947,32 @@ footer {
 .google-button:disabled {
   opacity: 0.65;
 }
+
+.google-web-button {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 40px;
+  margin: 12px auto;
+}
+.google-web-button[hidden] {
+  display: none;
+}
+
+.photo-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+.camera-preview video {
+  display: block;
+  width: 100%;
+  max-height: 360px;
+  background: #162f25;
+  object-fit: contain;
+  border-radius: 12px;
+}
+.product-photo small {
+  display: block;
+}

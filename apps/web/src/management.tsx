@@ -6,6 +6,7 @@ import {
   bogotaDate,
 } from "@playita/shared";
 import { Modal, money } from "./ui.js";
+import { ProductPhoto } from "./product-photo.js";
 import { StaffUsers } from "./staff.js";
 export type Api = (path: string, init?: RequestInit) => Promise<any>;
 export function Inventory({
@@ -405,7 +406,8 @@ function ProductEditor({
     }),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [priceUnit, setPriceUnit] = useState("kg");
+    [priceUnit, setPriceUnit] = useState("kg"),
+    [photoBusy, setPhotoBusy] = useState(false);
   const field = (key: keyof ProductWrite, v: any) =>
     setValue((p) => ({ ...p, [key]: v }));
   return (
@@ -413,6 +415,7 @@ function ProductEditor({
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          if (busy || photoBusy) return;
           setBusy(true);
           save(value)
             .catch((e) => setError(String(e)))
@@ -554,50 +557,11 @@ function ProductEditor({
             onChange={(e) => field("description", e.target.value)}
           />
         </label>
-        <label>
-          Foto opcional (máximo 2 MB)
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              if (file.size > 2000000) {
-                setError("Elige una imagen de menos de 2 MB");
-                return;
-              }
-              void (async () => {
-                try {
-                  const bitmap = await createImageBitmap(file),
-                    scale = Math.min(
-                      1,
-                      640 / Math.max(bitmap.width, bitmap.height),
-                    ),
-                    canvas = document.createElement("canvas");
-                  canvas.width = Math.round(bitmap.width * scale);
-                  canvas.height = Math.round(bitmap.height * scale);
-                  canvas
-                    .getContext("2d")!
-                    .drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-                  const photo = canvas.toDataURL("image/jpeg", 0.75);
-                  bitmap.close();
-                  if (photo.length > 300000)
-                    throw Error("La imagen comprimida es demasiado grande");
-                  field("photo", photo);
-                } catch {
-                  setError("No fue posible preparar la imagen");
-                }
-              })();
-            }}
-          />
-        </label>
-        {value.photo && (
-          <img
-            className="photo-preview"
-            src={value.photo}
-            alt="Vista previa del producto"
-          />
-        )}
+        <ProductPhoto
+          photo={value.photo}
+          onChange={(photo) => field("photo", photo)}
+          onBusy={setPhotoBusy}
+        />
         <label className="check">
           <input
             type="checkbox"
@@ -697,7 +661,7 @@ function ProductEditor({
           </fieldset>
         )}
         <p role="alert">{error}</p>
-        <button className="primary" disabled={busy}>
+        <button className="primary" disabled={busy || photoBusy}>
           Guardar producto
         </button>
         <button type="button" onClick={close}>

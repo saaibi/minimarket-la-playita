@@ -21,7 +21,14 @@ export type OutboxRow = {
   response: string | null;
   resolved_by: string | null;
 };
-export const SQLITE_SCHEMA = `CREATE TABLE IF NOT EXISTS outbox(request_key TEXT PRIMARY KEY,owner_id TEXT NOT NULL,payload TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending_sync','syncing','synced','conflict')),attempts INTEGER NOT NULL DEFAULT 0,next_attempt_at INTEGER NOT NULL DEFAULT 0,lease_until INTEGER NOT NULL DEFAULT 0,lease_token TEXT,last_error TEXT,response TEXT,resolved_by TEXT,created_at INTEGER NOT NULL);CREATE INDEX IF NOT EXISTS outbox_owner ON outbox(owner_id,status,next_attempt_at);CREATE TABLE IF NOT EXISTS catalog_cache(owner_id TEXT PRIMARY KEY,payload TEXT NOT NULL,updated_at INTEGER NOT NULL);CREATE TABLE IF NOT EXISTS pos_attempts(request_key TEXT PRIMARY KEY,owner_id TEXT NOT NULL,payload TEXT NOT NULL,state TEXT NOT NULL,response TEXT,created_at INTEGER NOT NULL);PRAGMA user_version=1;`;
+const SQLITE_STATEMENTS = [
+  "CREATE TABLE IF NOT EXISTS outbox(request_key TEXT PRIMARY KEY,owner_id TEXT NOT NULL,payload TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('pending_sync','syncing','synced','conflict')),attempts INTEGER NOT NULL DEFAULT 0,next_attempt_at INTEGER NOT NULL DEFAULT 0,lease_until INTEGER NOT NULL DEFAULT 0,lease_token TEXT,last_error TEXT,response TEXT,resolved_by TEXT,created_at INTEGER NOT NULL)",
+  "CREATE INDEX IF NOT EXISTS outbox_owner ON outbox(owner_id,status,next_attempt_at)",
+  "CREATE TABLE IF NOT EXISTS catalog_cache(owner_id TEXT PRIMARY KEY,payload TEXT NOT NULL,updated_at INTEGER NOT NULL)",
+  "CREATE TABLE IF NOT EXISTS pos_attempts(request_key TEXT PRIMARY KEY,owner_id TEXT NOT NULL,payload TEXT NOT NULL,state TEXT NOT NULL,response TEXT,created_at INTEGER NOT NULL)",
+  "PRAGMA user_version=1",
+];
+export const SQLITE_SCHEMA = SQLITE_STATEMENTS.join(";\n") + ";";
 const driverQueues = new WeakMap<SqlDriver, Promise<unknown>>();
 export class Outbox {
   constructor(
@@ -47,7 +54,24 @@ export class Outbox {
         throw Error(
           "Versión SQLite futura: actualizar app, sin modificar la base",
         );
-      await this.db.execute(SQLITE_SCHEMA);
+      await this.db.execute("BEGIN IMMEDIATE");
+      try {
+        // Native Android executes one SQLite statement at a time. Repair additive
+        // tables even when a legacy installation already reports version 1.
+        for (const statement of SQLITE_STATEMENTS)
+          await this.db.execute(statement);
+        const tables = await this.db.query<{ name: string }>(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('outbox','catalog_cache','pos_attempts')",
+        );
+        if (tables.length !== 3)
+          throw Error(
+            "No fue posible preparar el almacenamiento local; tus pendientes se conservan",
+          );
+        await this.db.execute("COMMIT");
+      } catch (error) {
+        await this.db.execute("ROLLBACK");
+        throw error;
+      }
     });
   }
   enqueue(draft: OrderDraft, key = crypto.randomUUID(), now = Date.now()) {

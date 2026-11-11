@@ -158,6 +158,36 @@ export class SessionClient {
   async googleOptions(): Promise<{ available: boolean; clientId?: string }> {
     return (await this.raw("/auth/options")).google ?? { available: false };
   }
+  async prepareGoogle() {
+    await this.flushLogout();
+    if (this.config.mode === "web" && this.config.intent?.get())
+      throw new SessionError(503, "LOGOUT_PENDING");
+    const generation = this.generation;
+    const challenge = await this.raw("/auth/google/challenge", {});
+    if (generation !== this.generation)
+      throw new SessionError(401, "SESSION_CHANGED");
+    return { ...challenge, generation } as {
+      challengeId: string;
+      nonce: string;
+      clientId: string;
+      proof?: string;
+      generation: number;
+    };
+  }
+  async completeGoogle(
+    challenge: Awaited<ReturnType<SessionClient["prepareGoogle"]>>,
+    credential: string,
+  ) {
+    if (challenge.generation !== this.generation)
+      throw new SessionError(401, "SESSION_CHANGED");
+    const generation = ++this.generation;
+    const data = await this.raw("/auth/google/verify", {
+      challengeId: challenge.challengeId,
+      credential,
+      ...(challenge.proof ? { proof: challenge.proof } : {}),
+    });
+    return this.accept(data, generation);
+  }
   async google(
     getCredential: (challenge: {
       challengeId: string;
