@@ -694,7 +694,7 @@ export function Shop() {
           </div>
         </header>
         <div className="environment-banner">
-          RECOGIDA EN TIENDA · COP · Una libra = 500 g
+          RECOGIDA EN TIENDA · COP
         </div>
         {cart.length > 0 && (
           <div className="cart-dock">
@@ -751,7 +751,7 @@ export function Shop() {
                     ? "Agrega productos y confirma el efectivo recibido para registrar una venta."
                     : "Elige tus productos y recógelos en La Playita."}
                 </p>
-                <small>Un kilo = 1.000 g · Una libra = 500 g · COP</small>
+                <small>Precios en COP</small>
                 {view === "catalog" && (
                   <img
                     className="store-photo"
@@ -1185,7 +1185,7 @@ export function ProductCard({
         <small>
           {p.kind === "weight"
             ? unit === "lb"
-              ? "por libra · 500 g"
+              ? "por libra"
               : "por kilo"
             : pres?.name}
         </small>
@@ -1209,7 +1209,7 @@ export function ProductCard({
               onChange={(e) => setUnit(e.target.value as "kg" | "lb")}
             >
               <option value="kg">Kilo</option>
-              <option value="lb">Libra · 500 g</option>
+              <option value="lb">Libra</option>
             </select>
           ) : (
             <select

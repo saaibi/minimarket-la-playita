@@ -483,7 +483,7 @@ function ProductEditor({
               onChange={(e) => setPriceUnit(e.target.value)}
             >
               <option value="kg">Kilo</option>
-              <option value="lb">Libra · 500 g</option>
+              <option value="lb">Libra</option>
             </select>
           </label>
         )}
