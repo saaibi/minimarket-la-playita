@@ -118,6 +118,32 @@ export class SessionClient {
     const data = await this.raw("/auth/login", { email, password });
     return this.accept(data, generation);
   }
+  async googleOptions(): Promise<{ available: boolean; clientId?: string }> {
+    return (await this.raw("/auth/options")).google ?? { available: false };
+  }
+  async google(
+    getCredential: (challenge: {
+      challengeId: string;
+      nonce: string;
+      clientId: string;
+      proof?: string;
+    }) => Promise<string>,
+  ) {
+    await this.flushLogout();
+    if (this.config.mode === "web" && this.config.intent?.get())
+      throw new SessionError(503, "LOGOUT_PENDING");
+    const generation = ++this.generation;
+    const challenge = await this.raw("/auth/google/challenge", {});
+    const credential = await getCredential(challenge);
+    if (generation !== this.generation)
+      throw new SessionError(401, "SESSION_CHANGED");
+    const data = await this.raw("/auth/google/verify", {
+      challengeId: challenge.challengeId,
+      credential,
+      ...(challenge.proof ? { proof: challenge.proof } : {}),
+    });
+    return this.accept(data, generation);
+  }
   async guest() {
     await this.flushLogout();
     if (this.config.mode === "web" && this.config.intent?.get())

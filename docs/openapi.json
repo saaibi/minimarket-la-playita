@@ -826,7 +826,163 @@
         "security": [],
         "responses": {
           "200": {
-            "description": "Guest/staff activos; Google/Apple disponibles=false hasta integración real"
+            "description": "Guest/staff activos; Google disponible solo con GOOGLE_WEB_CLIENT_ID; Apple omitido de la interfaz"
+          }
+        }
+      }
+    },
+    "/auth/google/challenge": {
+      "post": {
+        "security": [],
+        "description": "Inicia acceso Google: nonce y challenge de 5 minutos. Cookie HttpOnly web, proof explícito nativo. Sin acceso Gmail/contactos.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "challengeId, nonce, clientId y proof solo nativo"
+          },
+          "403": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/google/verify": {
+      "post": {
+        "security": [],
+        "description": "Verifica JWT Google RS256, audiencia, emisor, expiración, nonce y correo verificado. Challenge de un uso. Identidad por sub; sin vinculación por correo ni elevación de rol. Sesión buyer propia.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "challengeId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "credential": {
+                    "type": "string",
+                    "minLength": 100,
+                    "maxLength": 10000
+                  },
+                  "proof": {
+                    "type": "string",
+                    "minLength": 32,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "challengeId",
+                  "credential"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sesión propia con cookies web o tokens nativos"
+          },
+          "400": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Error explícito; conflicto no confirma ni reserva un pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }

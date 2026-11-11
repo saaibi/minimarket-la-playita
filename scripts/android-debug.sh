@@ -11,6 +11,7 @@ if [ ! -d apps/web/android ]; then
 fi
 npm run cap:sync -w @playita/web -- android
 "$PWD/.runtime/brand-venv/bin/python" scripts/native-brand.py
+python3 scripts/native-google.py
 # Standard generated debug signing only. No release/distribution keystore.
 python3 - <<'PY'
 from pathlib import Path

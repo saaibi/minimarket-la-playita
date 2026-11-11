@@ -30,6 +30,7 @@ import {
 import { Store } from "./store.js";
 import { AuthService, AuthError } from "./auth.js";
 import { type VerificationProvider } from "./verification.js";
+import type { GoogleVerifier } from "./google.js";
 import { json } from "express";
 const STORE = "STORE";
 type Request = { actor: Actor; headers: Record<string, string | undefined> };
@@ -43,7 +44,7 @@ class ApiController {
     try {
       const healthQuery = {
         text: "SELECT version FROM schema_migrations WHERE version = $1",
-        values: ["004_catalog_details.sql"],
+        values: ["005_google_signin.sql"],
         query_timeout: 2500,
       };
       const result = await this.store.pool.query(healthQuery);
@@ -253,6 +254,7 @@ export async function createApp(config: {
   databaseUrl: string;
   production?: boolean;
   verificationProvider?: VerificationProvider;
+  googleVerifier?: GoogleVerifier;
   origins?: string[];
 }) {
   const pool = new Pool(databaseOptions(config.databaseUrl));
@@ -304,6 +306,8 @@ export async function createApp(config: {
     !!config.production,
     config.verificationProvider,
     (family) => io?.in("session:" + family).disconnectSockets(true),
+    Date.now,
+    config.googleVerifier,
   );
   await auth.init();
   app.use(async (req: any, res: any, next: () => void) => {

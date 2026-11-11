@@ -12,6 +12,7 @@ const serialize = (
 ) => stringifySetCookie({ name, value, ...options });
 import { z } from "zod";
 import type { Actor } from "@playita/shared";
+import type { GoogleVerifier } from "./google.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import {
   UnavailableVerification,
@@ -49,6 +50,7 @@ export class AuthService {
     private provider: VerificationProvider = new UnavailableVerification(),
     private revoke: (family: string) => void = () => {},
     private clock = Date.now,
+    private google?: GoogleVerifier,
   ) {}
   async init() {
     this.dummy = await hashPassword(random());
@@ -272,9 +274,132 @@ export class AuthService {
         return res.json({
           guest: true,
           staffPassword: true,
-          google: { available: false, reason: "OIDC_INTEGRATION_PENDING" },
+          google: this.google
+            ? { available: true, clientId: this.google.clientId }
+            : { available: false, reason: "GOOGLE_NOT_CONFIGURED" },
           apple: { available: false, reason: "OIDC_INTEGRATION_PENDING" },
         });
+      if (req.method === "POST" && path === "/auth/google/challenge") {
+        const mode = this.mode(req);
+        z.object({}).strict().parse(body);
+        if (!this.google) throw new AuthError(503, "GOOGLE_NOT_CONFIGURED");
+        await this.rate(
+          req,
+          req.socket.remoteAddress || "unknown",
+          "google-start",
+          20,
+        );
+        const id = randomUUID(),
+          nonce = random(),
+          proof = random();
+        await this.pool.query(
+          "DELETE FROM google_challenges WHERE expires_at<$1",
+          [new Date(this.clock() - 86400000)],
+        );
+        await this.pool.query(
+          "INSERT INTO google_challenges(id,client_type,proof_hash,nonce,expires_at) VALUES($1,$2,$3,$4,$5)",
+          [id, mode, digest(proof), nonce, new Date(this.clock() + 300000)],
+        );
+        if (mode === "web")
+          res.setHeader(
+            "Set-Cookie",
+            serialize("playita_google", proof, {
+              path: "/",
+              httpOnly: true,
+              secure: this.secure,
+              sameSite: "strict",
+              maxAge: 300,
+            }),
+          );
+        return res.json({
+          challengeId: id,
+          nonce,
+          clientId: this.google.clientId,
+          ...(mode === "native" ? { proof } : {}),
+        });
+      }
+      if (req.method === "POST" && path === "/auth/google/verify") {
+        const mode = this.mode(req);
+        if (!this.google) throw new AuthError(503, "GOOGLE_NOT_CONFIGURED");
+        const input = z
+          .object({
+            challengeId: z.uuid(),
+            credential: z.string().min(100).max(10000),
+            proof: z.string().min(32).max(100).optional(),
+          })
+          .strict()
+          .parse(body);
+        await this.rate(req, input.challengeId, "google-verify", 5);
+        const proof =
+          mode === "native" ? input.proof : this.cookies(req).playita_google;
+        if (!proof) throw new AuthError(401, "GOOGLE_SIGNIN_FAILED");
+        const c = (
+          await this.pool.query(
+            "UPDATE google_challenges SET attempts=attempts+1 WHERE id=$1 AND client_type=$2 AND proof_hash=$3 AND consumed_at IS NULL AND expires_at>$4 AND attempts<5 RETURNING *",
+            [input.challengeId, mode, digest(proof), new Date(this.clock())],
+          )
+        ).rows[0];
+        if (!c) throw new AuthError(401, "GOOGLE_SIGNIN_FAILED");
+        let identity;
+        try {
+          identity = await this.google.verify(input.credential, c.nonce);
+        } catch {
+          throw new AuthError(401, "GOOGLE_SIGNIN_FAILED");
+        }
+        const db = await this.pool.connect();
+        try {
+          await db.query("BEGIN");
+          const consumed = await db.query(
+            "UPDATE google_challenges SET consumed_at=$2 WHERE id=$1 AND consumed_at IS NULL AND expires_at>$2 RETURNING id",
+            [c.id, new Date(this.clock())],
+          );
+          if (!consumed.rowCount)
+            throw new AuthError(401, "GOOGLE_SIGNIN_FAILED");
+          // Serialize concurrent sign-ins for the same subject without linking by email.
+          await db.query(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1,77332005))",
+            [identity.subject],
+          );
+          let user = (
+            await db.query(
+              "SELECT u.* FROM google_identities g JOIN app_users u ON u.id=g.user_id WHERE g.subject=$1 FOR UPDATE OF u",
+              [identity.subject],
+            )
+          ).rows[0];
+          if (!user) {
+            if (
+              (
+                await db.query("SELECT 1 FROM app_users WHERE email=$1", [
+                  identity.email,
+                ])
+              ).rowCount
+            )
+              throw new AuthError(409, "ACCOUNT_EXISTS_USE_EXISTING_LOGIN");
+            user = (
+              await db.query(
+                "INSERT INTO app_users(id,email,role) VALUES($1,$2,'buyer') RETURNING *",
+                [randomUUID(), identity.email],
+              )
+            ).rows[0];
+            await db.query(
+              "INSERT INTO google_identities(subject,user_id) VALUES($1,$2)",
+              [identity.subject, user.id],
+            );
+          }
+          if (!user.active || user.role !== "buyer")
+            throw new AuthError(403, "GOOGLE_SIGNIN_FAILED");
+          const result = await this.issue(db, user, mode);
+          await db.query("COMMIT");
+          return this.respond(res, mode, result);
+        } catch (e: any) {
+          await db.query("ROLLBACK");
+          if (e.code === "23505")
+            throw new AuthError(409, "ACCOUNT_EXISTS_USE_EXISTING_LOGIN");
+          throw e;
+        } finally {
+          db.release();
+        }
+      }
       if (req.method === "POST" && path === "/auth/guest") {
         const mode = this.mode(req);
         z.object({}).strict().parse(body);

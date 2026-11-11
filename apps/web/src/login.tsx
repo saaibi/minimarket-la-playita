@@ -2,6 +2,7 @@ import React from "react";
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { auth, useSession } from "./session.js";
+import { GoogleLogin } from "./google-login.js";
 import { Brand } from "./ui.js";
 export function Login() {
   const session = useSession(),
@@ -47,15 +48,10 @@ export function Login() {
           este navegador o app; no permite recuperar pedidos desde otro
           dispositivo.
         </small>
-        <button disabled title="Integración OIDC pendiente">
-          Continuar con Google · próximamente
-        </button>
-        <button disabled title="Integración OIDC pendiente">
-          Continuar con Apple · próximamente
-        </button>
+        <GoogleLogin disabled={busy} onBusy={setBusy} />
         <small>
-          Opciones preparadas, todavía no conectadas. No leemos Gmail ni tomamos
-          datos de la cuenta del dispositivo.
+          Google solo se usa para identificarte. No solicitamos acceso a Gmail
+          ni a tus contactos.
         </small>
       </section>
       <section className="panel">

@@ -40,7 +40,9 @@ export default defineConfig({
             const cookies = response.headers["set-cookie"];
             if (cookies)
               response.headers["set-cookie"] = cookies.map((v) =>
-                v.replace(/;\s*Secure/gi, ""),
+                v
+                  .replace(/;\s*Secure/gi, "")
+                  .replace(/Path=\/auth(?=;|$)/gi, "Path=/api/auth"),
               );
           });
         },

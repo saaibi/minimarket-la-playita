@@ -15,7 +15,13 @@ if (process.env.WHATSAPP_PROVIDER === "twilio") {
     process.env.TWILIO_VERIFY_SERVICE_SID || "",
   );
 }
+const googleVerifier = process.env.GOOGLE_WEB_CLIENT_ID
+  ? new (await import("./google.js")).GoogleIdVerifier(
+      process.env.GOOGLE_WEB_CLIENT_ID,
+    )
+  : undefined;
 const server = await createApp({
+  googleVerifier,
   databaseUrl,
   production: process.env.NODE_ENV === "production",
   origins: process.env.CORS_ORIGINS?.split(",")

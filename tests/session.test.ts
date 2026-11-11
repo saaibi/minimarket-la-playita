@@ -206,3 +206,52 @@ test("restauración bloqueada vence sin borrar vault y una respuesta tardía no 
   assert.equal(stuck.current, null);
   assert.equal(removed, 0);
 });
+test("Google nativo: challenge, token solo al servidor y sesión en vault; cancelación no autentica", async () => {
+  const vault = new TestVault();
+  const calls: Array<{ path: string; body: any }> = [];
+  const client = new SessionClient({
+    base: "https://api.example.invalid",
+    mode: "native",
+    vault,
+    fetch: async (input, init) => {
+      const path = String(input),
+        body = init?.body ? JSON.parse(String(init.body)) : null;
+      calls.push({ path, body });
+      if (path.endsWith("/challenge"))
+        return Response.json({
+          challengeId: "challenge-test",
+          nonce: "nonce-test",
+          clientId: "test.apps.googleusercontent.com",
+          proof: "proof-test",
+        });
+      if (path.endsWith("/verify"))
+        return Response.json({
+          actor: { ...actor("google-buyer"), guest: false },
+          accessExpiresAt: Date.now() + 300000,
+          accessToken: "access-test",
+          refreshToken: "refresh-test",
+        });
+      throw Error("unexpected path");
+    },
+  });
+  await assert.rejects(
+    client.google(async () => {
+      throw Error("cancelled");
+    }),
+  );
+  assert.equal(client.current, null);
+  assert.equal(
+    calls.some((c) => c.path.endsWith("/verify")),
+    false,
+  );
+  await client.google(async (challenge) => {
+    assert.equal(challenge.nonce, "nonce-test");
+    return "google-id-token-test";
+  });
+  assert.equal(client.current!.actor.id, "google-buyer");
+  assert.equal(calls.at(-1)!.body.proof, "proof-test");
+  assert.equal(calls.at(-1)!.body.credential, "google-id-token-test");
+  const saved = await vault.get("session");
+  assert.ok(saved?.includes("refresh-test"));
+  assert.equal(saved?.includes("google-id-token-test"), false);
+});
