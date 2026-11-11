@@ -26,6 +26,7 @@ export default defineConfig({
     host: "127.0.0.1",
     port: 5173,
     strictPort: true,
+    watch: { usePolling: true, interval: 500 },
     proxy: {
       "/api": {
         target,

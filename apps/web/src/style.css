@@ -922,3 +922,27 @@ footer {
     height: 105px;
   }
 }
+
+.google-button {
+  background: #fff;
+  color: #1f1f1f;
+  border: 1px solid #747775;
+  border-radius: 20px;
+  padding: 0 12px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.google-button img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex: none;
+}
+.google-button:disabled {
+  opacity: 0.65;
+}

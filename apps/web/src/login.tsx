@@ -2,6 +2,7 @@ import React from "react";
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
 import { auth, useSession } from "./session.js";
+import { SessionError } from "@playita/mobile";
 import { GoogleLogin } from "./google-login.js";
 import { Brand } from "./ui.js";
 export function Login() {
@@ -17,10 +18,8 @@ export function Login() {
     try {
       await fn();
       setPassword("");
-    } catch {
-      setError(
-        "No fue posible iniciar sesión. Revisa tus datos o la conexión e inténtalo de nuevo.",
-      );
+    } catch (error) {
+      setError(loginErrorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -84,7 +83,13 @@ export function Login() {
               maxLength={128}
             />
           </label>
-          <button disabled={busy}>Ingresar</button>
+          <button disabled={busy}>{busy ? "Conectando…" : "Ingresar"}</button>
+          {busy && (
+            <p role="status">
+              La primera conexión puede tardar alrededor de un minuto mientras
+              despierta el servidor.
+            </p>
+          )}
         </form>
         <small>
           Administradores y vendedores creados por un administrador.
@@ -112,4 +117,24 @@ export function Protected({
   )
     return <Navigate to="/app" replace />;
   return children;
+}
+
+export function loginErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message.startsWith("NATIVE_STORAGE_"))
+    return "No se pudo leer la sesión segura del dispositivo. Cierra y vuelve a abrir la app, sin borrar sus datos.";
+  if (error instanceof SessionError) {
+    if (error.code === "SESSION_STORAGE_UNAVAILABLE")
+      return "El acceso fue validado, pero no se pudo guardar la sesión segura en este dispositivo. Cierra y vuelve a abrir la app sin borrar sus datos.";
+    if (error.code === "NETWORK_UNAVAILABLE")
+      return "No se pudo conectar con la tienda. Revisa la conexión del teléfono y vuelve a intentar.";
+    if (error.code === "REQUEST_TIMEOUT")
+      return "La tienda tardó demasiado en responder. Espera unos segundos y vuelve a intentar; el servidor puede estar despertando.";
+    if (error.status === 401)
+      return "El correo o la contraseña no coinciden. Usa los mismos datos de tu cuenta del personal.";
+    if (error.status === 429)
+      return "Hay demasiados intentos de acceso. Espera unos minutos antes de reintentar.";
+    if (error.status >= 500)
+      return "El servicio de acceso no está disponible en este momento. Vuelve a intentar en unos segundos.";
+  }
+  return "No fue posible completar el acceso en este dispositivo. Cierra y vuelve a abrir la app, sin borrar sus datos.";
 }

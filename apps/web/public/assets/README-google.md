@@ -1,0 +1,1 @@
+Google G oficial descargado de https://developers.google.com/static/identity/images/g-logo.png, enlazado por https://developers.google.com/identity/branding-guidelines. Usado para el botón de acceso, sin modificar colores ni proporciones. El botón de elección de cuenta web lo renderiza Google Identity Services.

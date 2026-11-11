@@ -34,6 +34,7 @@ export class SessionClient {
       vault?: SecretVault;
       fetch?: typeof fetch;
       restoreTimeoutMs?: number;
+      authTimeoutMs?: number;
       csrf?: () => string;
       lock?: <T>(fn: () => Promise<T>) => Promise<T>;
       intent?: { get(): boolean; set(value: boolean): void };
@@ -49,8 +50,35 @@ export class SessionClient {
     this.current = session;
     for (const fn of this.listeners) fn();
   }
+  private async fetchTimed(
+    url: string,
+    init: RequestInit,
+    milliseconds = 10000,
+  ) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), milliseconds);
+    try {
+      return await (this.config.fetch || fetch)(url, {
+        ...init,
+        signal: controller.signal,
+      });
+    } catch {
+      throw new SessionError(
+        controller.signal.aborted ? 503 : 0,
+        controller.signal.aborted ? "REQUEST_TIMEOUT" : "NETWORK_UNAVAILABLE",
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
   private async raw(path: string, body?: unknown, access = false) {
-    const response = await (this.config.fetch || fetch)(
+    const interactive = [
+      "/auth/login",
+      "/auth/guest",
+      "/auth/google/challenge",
+      "/auth/options",
+    ].includes(path);
+    const response = await this.fetchTimed(
       this.config.base + path,
       {
         method: body === undefined ? "GET" : "POST",
@@ -65,10 +93,15 @@ export class SessionClient {
               : {}),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        signal: AbortSignal.timeout(10000),
       },
+      interactive ? (this.config.authTimeoutMs ?? 75000) : 10000,
     );
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      throw new SessionError(response.status || 503, "SERVER_UNAVAILABLE");
+    }
     if (!response.ok)
       throw new SessionError(response.status, data.code || "AUTH_REQUIRED");
     return data;
@@ -90,13 +123,17 @@ export class SessionClient {
       await this.locked(async () => {
         if (generation !== this.generation)
           throw new SessionError(401, "SESSION_CHANGED");
-        await this.config.vault!.set(
-          "session",
-          JSON.stringify({
-            actor: data.actor,
-            refreshToken: data.refreshToken,
-          }),
-        );
+        try {
+          await this.config.vault!.set(
+            "session",
+            JSON.stringify({
+              actor: data.actor,
+              refreshToken: data.refreshToken,
+            }),
+          );
+        } catch {
+          throw new SessionError(503, "SESSION_STORAGE_UNAVAILABLE");
+        }
       });
       if (generation !== this.generation)
         throw new SessionError(401, "SESSION_CHANGED");
@@ -194,7 +231,7 @@ export class SessionClient {
       } catch (e) {
         ensure();
         this.access = "";
-        if (e instanceof SessionError) {
+        if (e instanceof SessionError && e.status === 401) {
           await this.config.vault!.set(
             "session",
             JSON.stringify({ actor: record.actor }),
@@ -277,7 +314,7 @@ export class SessionClient {
     if (generation !== this.generation || this.current?.actor.id !== owner)
       throw new SessionError(401, "ACCOUNT_MISMATCH");
     const run = () =>
-      (this.config.fetch || fetch)(this.config.base + path, {
+      this.fetchTimed(this.config.base + path, {
         ...init,
         credentials: this.config.mode === "web" ? "include" : "omit",
         headers: {
@@ -288,7 +325,6 @@ export class SessionClient {
             : { "X-CSRF-Token": this.config.csrf?.() || "" }),
           ...init.headers,
         },
-        signal: AbortSignal.timeout(10000),
       });
     let response = await run();
     if (response.status === 401) {

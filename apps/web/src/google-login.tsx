@@ -167,7 +167,12 @@ export function GoogleLogin({
   }
   return (
     <>
-      <button disabled={disabled || !available} onClick={() => void login()}>
+      <button
+        className="google-button"
+        disabled={disabled || !available}
+        onClick={() => void login()}
+      >
+        <img src="/assets/google-g.png" alt="" aria-hidden="true" />
         {available
           ? "Continuar con Google"
           : "Continuar con Google · pendiente de configuración"}
