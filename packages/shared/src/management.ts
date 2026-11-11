@@ -53,16 +53,36 @@ export const productWriteSchema = z
 export type ProductWrite = z.infer<typeof productWriteSchema>;
 export const stockAdjustmentSchema = z
   .object({
-    delta: z
-      .number()
-      .int()
-      .min(-100000000)
-      .max(100000000)
-      .refine((n) => n !== 0),
+    delta: z.number().int().min(-100000000).max(100000000),
     reason: z.string().trim().min(3).max(200),
     version: z.number().int().positive(),
+    priceCop: money.optional(),
+    presentationPrices: z
+      .array(z.object({ id: z.uuid(), priceCop: money }).strict())
+      .min(1)
+      .max(30)
+      .optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (v) =>
+      v.delta !== 0 ||
+      v.priceCop !== undefined ||
+      v.presentationPrices !== undefined,
+    "Indica cantidad o precio",
+  )
+  .refine(
+    (v) => !(v.priceCop !== undefined && v.presentationPrices !== undefined),
+    "Usa precio por kilo o precios por presentación",
+  )
+  .refine(
+    (v) =>
+      !v.presentationPrices ||
+      new Set(v.presentationPrices.map((p) => p.id)).size ===
+        v.presentationPrices.length,
+    "Presentaciones únicas",
+  );
+export type StockAdjustment = z.infer<typeof stockAdjustmentSchema>;
 const time = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
 const day = z
   .object({ closed: z.boolean(), open: time, close: time })

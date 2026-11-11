@@ -5,6 +5,7 @@ import {
   isStoreOpen,
   bogotaDate,
   productWriteSchema,
+  stockAdjustmentSchema,
 } from "@playita/shared";
 import { Outbox } from "../packages/mobile/src/outbox.js";
 import { NodeSqliteDriver } from "./sqlite-driver.js";
@@ -68,4 +69,41 @@ test("POS durable: mismo intento tras reinicio, aislado por actor y sin modifica
   await box.finishSale(key, { id: "receipt" });
   assert.equal(await box.pendingSale(), null);
   db.close();
+});
+
+test("ajuste con precio opcional, cantidades cero solo con precio y validación monetaria", () => {
+  const base = { delta: 0, reason: "Precio nuevo", version: 1 };
+  assert.equal(stockAdjustmentSchema.safeParse(base).success, false);
+  assert.equal(
+    stockAdjustmentSchema.safeParse({ ...base, delta: 10 }).success,
+    true,
+  );
+  assert.equal(
+    stockAdjustmentSchema.safeParse({ ...base, priceCop: 2500 }).success,
+    true,
+  );
+  for (const priceCop of [-1, 2.5, 100000001])
+    assert.equal(
+      stockAdjustmentSchema.safeParse({ ...base, priceCop }).success,
+      false,
+    );
+  const v = { id: "11111111-1111-4111-8111-111111111111", priceCop: 500 };
+  assert.equal(
+    stockAdjustmentSchema.safeParse({ ...base, presentationPrices: [v] })
+      .success,
+    true,
+  );
+  assert.equal(
+    stockAdjustmentSchema.safeParse({ ...base, presentationPrices: [v, v] })
+      .success,
+    false,
+  );
+  assert.equal(
+    stockAdjustmentSchema.safeParse({
+      ...base,
+      priceCop: 100,
+      presentationPrices: [v],
+    }).success,
+    false,
+  );
 });

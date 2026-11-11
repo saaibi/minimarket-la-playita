@@ -231,6 +231,102 @@ test(
       );
       assert.equal(adjustments.status, 201);
       p = (await req("/inventory", admin)).data.find((x: any) => x.id === p.id);
+      // Stock and every presentation price commit together; old order snapshots stay fixed.
+      const beforePrices = p;
+      const priceBody = {
+        delta: 2,
+        reason: "Nuevo lote y precio",
+        version: p.version,
+        presentationPrices: p.presentations.map((v: any) => ({
+          id: v.id,
+          priceCop: v.priceCop + 100,
+        })),
+      };
+      const priceKey = crypto.randomUUID();
+      assert.equal(
+        (
+          await req(
+            "/inventory/" + p.id + "/adjustments",
+            seller,
+            "POST",
+            priceBody,
+          )
+        ).status,
+        403,
+      );
+      assert.equal(
+        (
+          await req("/inventory/" + p.id + "/adjustments", admin, "POST", {
+            ...priceBody,
+            presentationPrices: [{ id: crypto.randomUUID(), priceCop: 1 }],
+          })
+        ).status,
+        409,
+      );
+      p = (await req("/inventory", admin)).data.find((x: any) => x.id === p.id);
+      assert.equal(p.stock, beforePrices.stock);
+      assert.equal(p.version, beforePrices.version);
+      assert.equal(
+        (
+          await req(
+            "/inventory/" + p.id + "/adjustments",
+            admin,
+            "POST",
+            priceBody,
+            priceKey,
+          )
+        ).status,
+        201,
+      );
+      assert.equal(
+        (
+          await req(
+            "/inventory/" + p.id + "/adjustments",
+            admin,
+            "POST",
+            priceBody,
+            priceKey,
+          )
+        ).replayed,
+        "true",
+      );
+      p = (await req("/inventory", admin)).data.find((x: any) => x.id === p.id);
+      assert.equal(p.stock, beforePrices.stock + 2);
+      assert.equal(p.priceCop, beforePrices.priceCop + 100);
+      for (const v of p.presentations)
+        assert.equal(
+          v.priceCop,
+          beforePrices.presentations.find((x: any) => x.id === v.id).priceCop +
+            100,
+        );
+      assert.equal(
+        (await req("/orders/" + order.id, buyer)).data.lines[0].priceCop,
+        13000,
+      );
+      assert.equal(
+        (await req("/orders", buyer, "POST", draft)).data.code,
+        "PRICE_CHANGED",
+      );
+      draft.lines[0]!.expectedPriceCop += 100;
+      const priceOnly = {
+        delta: 0,
+        reason: "Corrección solo de precio",
+        version: p.version,
+        presentationPrices: priceBody.presentationPrices,
+      };
+      assert.equal(
+        (
+          await req(
+            "/inventory/" + p.id + "/adjustments",
+            admin,
+            "POST",
+            priceOnly,
+          )
+        ).status,
+        201,
+      );
+      p = (await req("/inventory", admin)).data.find((x: any) => x.id === p.id);
+      assert.equal(p.stock, beforePrices.stock + 2);
       const update = {
         ...input,
         version: p.version,

@@ -7,6 +7,7 @@ import {
   type Actor,
   type OrderDraft,
   type ProductWrite,
+  type StockAdjustment,
   type Schedule,
   isStoreOpen,
   bogotaDate,
@@ -660,12 +661,7 @@ export class Store {
       },
     );
   }
-  adjustStock(
-    actor: Actor,
-    key: string,
-    id: string,
-    input: { delta: number; reason: string; version: number },
-  ) {
+  adjustStock(actor: Actor, key: string, id: string, input: StockAdjustment) {
     return this.once(
       actor,
       key,
@@ -691,17 +687,67 @@ export class Store {
             "RESERVED_STOCK",
             "Las existencias no pueden quedar por debajo de lo reservado",
           );
+        const oldPrices = (
+          await db.query(
+            'SELECT id,price_cop AS "priceCop",is_base AS "isBase" FROM presentations WHERE product_id=$1 ORDER BY id',
+            [id],
+          )
+        ).rows;
+        let price = old.price_cop;
+        if (input.priceCop !== undefined) {
+          if (old.kind !== "weight")
+            throw new Conflict(
+              "PRESENTATION_CHANGED",
+              "Revisa los precios de las presentaciones",
+            );
+          price = input.priceCop;
+        }
+        if (input.presentationPrices) {
+          if (
+            old.kind !== "unit" ||
+            input.presentationPrices.length !== oldPrices.length ||
+            input.presentationPrices.some(
+              (v) => !oldPrices.some((p) => p.id === v.id),
+            )
+          )
+            throw new Conflict(
+              "PRESENTATION_CHANGED",
+              "Las presentaciones cambiaron; vuelve a consultar el producto",
+            );
+          for (const v of input.presentationPrices) {
+            await db.query(
+              "UPDATE presentations SET price_cop=$2 WHERE id=$1 AND product_id=$3",
+              [v.id, v.priceCop, id],
+            );
+            if (oldPrices.find((p) => p.id === v.id).isBase) price = v.priceCop;
+          }
+        }
         await db.query(
-          "UPDATE products SET stock=$2,version=version+1 WHERE id=$1",
-          [id, stock],
+          "UPDATE products SET stock=$2,price_cop=$3,version=version+1 WHERE id=$1",
+          [id, stock, price],
         );
         await this.audit(
           db,
           actor,
           "stock.adjusted",
           id,
-          { stock: old.stock, reserved: old.reserved },
-          { stock, delta: input.delta },
+          {
+            stock: old.stock,
+            reserved: old.reserved,
+            priceCop: old.price_cop,
+            presentationPrices: oldPrices.map(({ id, priceCop }) => ({
+              id,
+              priceCop,
+            })),
+          },
+          {
+            stock,
+            delta: input.delta,
+            priceCop: price,
+            presentationPrices:
+              input.presentationPrices ??
+              oldPrices.map(({ id, priceCop }) => ({ id, priceCop })),
+          },
           input.reason,
         );
         await this.event(db, events, "inventory.changed", null, {

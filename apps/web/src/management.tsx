@@ -31,6 +31,8 @@ export function Inventory({
     [edit, setEdit] = useState<Product | null | undefined>(),
     [adjust, setAdjust] = useState<Product | null>(null),
     [delta, setDelta] = useState(""),
+    [changePrice, setChangePrice] = useState(false),
+    [prices, setPrices] = useState<Record<string, string>>({}),
     [reason, setReason] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -191,7 +193,18 @@ export function Inventory({
                       <button
                         onClick={() => {
                           setAdjust(p);
-                          setDelta("");
+                          setDelta("0");
+                          setChangePrice(false);
+                          setPrices(
+                            p.kind === "weight"
+                              ? { kilo: String(p.priceCop) }
+                              : Object.fromEntries(
+                                  p.presentations.map((v) => [
+                                    v.id,
+                                    String(v.priceCop),
+                                  ]),
+                                ),
+                          );
                           setReason("");
                           setError("");
                         }}
@@ -244,6 +257,16 @@ export function Inventory({
                   delta: Number(delta),
                   reason,
                   version: adjust.version,
+                  ...(changePrice
+                    ? adjust.kind === "weight"
+                      ? { priceCop: Number(prices.kilo) }
+                      : {
+                          presentationPrices: adjust.presentations.map((v) => ({
+                            id: v.id,
+                            priceCop: Number(prices[v.id]),
+                          })),
+                        }
+                    : {}),
                 }),
               })
                 .then(reload)
@@ -262,6 +285,43 @@ export function Inventory({
                 onChange={(e) => setDelta(e.target.value)}
               />
             </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={changePrice}
+                onChange={(e) => setChangePrice(e.target.checked)}
+              />
+              Actualizar también el precio de venta
+            </label>
+            {changePrice && (
+              <fieldset>
+                <legend>Nuevos precios de venta</legend>
+                <p>
+                  Se aplican a compras nuevas. Los pedidos ya creados conservan
+                  su precio. Puedes dejar el cambio de cantidad en cero para
+                  actualizar solo precios.
+                </p>
+                {(adjust.kind === "weight"
+                  ? [{ id: "kilo", name: "Precio por kilo" }]
+                  : adjust.presentations
+                ).map((v) => (
+                  <label key={v.id}>
+                    {v.name} (COP)
+                    <input
+                      type="number"
+                      min="0"
+                      max="100000000"
+                      step="1"
+                      required
+                      value={prices[v.id] ?? ""}
+                      onChange={(e) =>
+                        setPrices({ ...prices, [v.id]: e.target.value })
+                      }
+                    />
+                  </label>
+                ))}
+              </fieldset>
+            )}
             <label>
               Motivo obligatorio
               <input
@@ -937,7 +997,7 @@ function AuditSettings({ api }: { api: Api }) {
         <article className="audit" key={r.id}>
           <strong>
             {r.kind === "stock.adjusted"
-              ? "Ajuste de existencias"
+              ? "Ajuste de existencias y precios"
               : r.kind === "sale"
                 ? "Venta de caja"
                 : r.kind === "product.created"

@@ -117,6 +117,26 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
         assert.ok(view.getByRole("heading", { name: "Horario · Bogotá" }));
         fireEvent.click(view.getByRole("button", { name: "Inventario" }));
         assert.ok(view.getByRole("columnheader", { name: "Costo base" }));
+        fireEvent.click(view.getByRole("button", { name: "Ajustar" }));
+        assert.equal(
+          view.queryByRole("group", { name: "Nuevos precios de venta" }),
+          null,
+        );
+        fireEvent.click(
+          view.getByRole("checkbox", {
+            name: "Actualizar también el precio de venta",
+          }),
+        );
+        assert.ok(view.getByRole("group", { name: "Nuevos precios de venta" }));
+        assert.equal(
+          (view.getByLabelText("Unidad (COP)") as HTMLInputElement).value,
+          "650",
+        );
+        fireEvent.click(
+          within(view.getByRole("dialog")).getByRole("button", {
+            name: "Cancelar",
+          }),
+        );
         fireEvent.click(view.getByRole("button", { name: "Caja" }));
       }
       if (role === "seller") {
