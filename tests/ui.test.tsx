@@ -66,7 +66,11 @@ test("React DOM: acceso, invitado/social deshabilitado, rutas protegidas y alta 
     );
     assert.ok(view.getByText("Continuar como invitado"));
     assert.equal(
-      (view.getByText(/Continuar con Google/) as HTMLButtonElement).disabled,
+      (
+        view.getByRole("button", {
+          name: "Acceder con Google",
+        }) as HTMLButtonElement
+      ).disabled,
       true,
     );
     assert.equal(view.queryByText(/Continuar con Apple/), null);

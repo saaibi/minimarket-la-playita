@@ -80,9 +80,9 @@ function WebGoogle({
         google.accounts.id.renderButton(ref.current, {
           theme: "outline",
           size: "large",
-          text: "continue_with",
+          type: "icon",
+          shape: "circle",
           locale: "es",
-          width: 280,
         });
       })
       .catch(() => {
@@ -169,13 +169,16 @@ export function GoogleLogin({
     <>
       <button
         className="google-button"
+        aria-label="Acceder con Google"
+        title={
+          available
+            ? "Acceder con Google"
+            : "Google pendiente de conexión o configuración"
+        }
         disabled={disabled || !available}
         onClick={() => void login()}
       >
         <img src="/assets/google-g.png" alt="" aria-hidden="true" />
-        {available
-          ? "Continuar con Google"
-          : "Continuar con Google · pendiente de configuración"}
       </button>
       {error && <p role="alert">{error}</p>}
       {prompt && (
