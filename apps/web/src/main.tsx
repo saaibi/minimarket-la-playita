@@ -71,8 +71,20 @@ function Root() {
     );
   if (!ready)
     return (
-      <main>
-        <p role="status">Comprobando sesión…</p>
+      <main
+        className="session-loading"
+        aria-busy="true"
+        aria-label="Comprobando sesión"
+      >
+        <div role="status" className="session-loading-mark">
+          <img
+            src="/assets/marca-cargando.svg"
+            alt="Minimarket La Playita"
+            width="570"
+            height="495"
+          />
+          <span className="sr-only">Comprobando sesión…</span>
+        </div>
       </main>
     );
   return (
