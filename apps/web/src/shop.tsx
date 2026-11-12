@@ -82,6 +82,11 @@ export function Shop() {
     [client, setClient] = useState(""),
     [reference, setReference] = useState(""),
     [cash, setCash] = useState(""),
+    [checkoutDraft, setCheckoutDraft] = useState({
+      clientId: "",
+      mode: "cash",
+      received: "",
+    }),
     [clients, setClients] = useState<
       { id: string; name: string; contact: string }[]
     >([]),
@@ -297,7 +302,7 @@ export function Shop() {
     let saleKey: string | undefined;
     try {
       if (!cart.length) throw Error("Tu canasta está vacía");
-      const sale = staff && (view === "pos" || pendingSale);
+      const sale = staff;
       const draft: OrderDraft = {
         lines: cart,
         paymentMethod: sale ? "cash" : payment,
@@ -696,18 +701,16 @@ export function Shop() {
               </div>
             </div>
             <div className="header-actions">
-              {view !== "pos" && (
-                <Button
-                  className="icon-button"
-                  aria-label="Ver canasta"
-                  onClick={() => setCartOpen(true)}
-                >
-                  <Icon name="basket" />
-                  {cart.length > 0 && (
-                    <span className="badge">{cart.length}</span>
-                  )}
-                </Button>
-              )}
+              <Button
+                className="icon-button"
+                aria-label="Ver canasta"
+                onClick={() => setCartOpen(true)}
+              >
+                <Icon name="basket" />
+                {cart.length > 0 && (
+                  <span className="badge">{cart.length}</span>
+                )}
+              </Button>
               <Button
                 className="icon-button"
                 aria-label="Notificaciones"
@@ -869,7 +872,14 @@ export function Shop() {
             <Credits
               owner={session.actor.id}
               onChange={async (saleRecovered) => {
-                if (saleRecovered) setCart([]);
+                if (saleRecovered) {
+                  setCart([]);
+                  setCheckoutDraft({
+                    clientId: "",
+                    mode: "cash",
+                    received: "",
+                  });
+                }
                 await reload();
               }}
             />
@@ -994,7 +1004,7 @@ export function Shop() {
       </div>
       {cartOpen && (
         <Modal
-          title={staff && view === "pos" ? "Venta actual" : "Tu canasta"}
+          title={staff ? "Venta actual" : "Tu canasta"}
           close={() => setCartOpen(false)}
         >
           {pendingSale && (
@@ -1042,28 +1052,6 @@ export function Shop() {
           ) : (
             <p className="empty">Tu canasta está vacía.</p>
           )}
-          {staff && view !== "pos" && (
-            <label>
-              Cliente (opcional)
-              <Select
-                value={clients.find((c) => c.name === client)?.id || ""}
-                disabled={pendingSale || busy}
-                onChange={(e) => {
-                  const c = clients.find((c) => c.id === e.target.value);
-                  setClient(c?.name || "");
-                  setReference("");
-                }}
-              >
-                <option value="">Cliente general</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                    {c.contact ? " · " + c.contact : ""}
-                  </option>
-                ))}
-              </Select>
-            </label>
-          )}
           {!staff && (
             <label>
               Cliente (opcional)
@@ -1076,7 +1064,7 @@ export function Shop() {
               />
             </label>
           )}
-          {!(staff && view === "pos") && (
+          {!staff && (
             <label>
               Forma de pago
               <Select
@@ -1091,7 +1079,7 @@ export function Shop() {
               </Select>
             </label>
           )}
-          {staff && view === "pos" && pendingSale && (
+          {staff && pendingSale && (
             <>
               <label>
                 Efectivo recibido (COP)
@@ -1119,20 +1107,23 @@ export function Shop() {
             <strong>{money(total)}</strong>
           </div>
           <p>
-            {staff && view === "pos"
+            {staff
               ? "Revisa el cliente y el tipo de cobro antes de confirmar. Requiere conexión."
               : payment === "nequi"
                 ? "No se procesa ni confirma un pago Nequi desde la aplicación."
                 : "La tienda confirma el pago en efectivo al recoger."}
           </p>
-          {staff && view === "pos" && !pendingSale && (
+          {staff && !pendingSale && (
             <Checkout
               owner={session.actor.id}
               lines={cart}
               total={total}
               onBusy={setBusy}
+              draft={checkoutDraft}
+              onDraftChange={setCheckoutDraft}
               onSaved={() => {
                 setCart([]);
+                setCheckoutDraft({ clientId: "", mode: "cash", received: "" });
                 setCartOpen(false);
                 setCash("");
                 setMessage("Venta registrada");
@@ -1151,7 +1142,7 @@ export function Shop() {
             </p>
           )}
           <p role="alert">{message}</p>
-          {(!staff || view !== "pos" || pendingSale) && (
+          {(!staff || pendingSale) && (
             <Button
               className="primary"
               disabled={busy || !cart.length}
@@ -1159,7 +1150,7 @@ export function Shop() {
             >
               {busy
                 ? "Procesando…"
-                : staff && view === "pos"
+                : staff
                   ? "Confirmar efectivo y registrar venta"
                   : revision
                     ? "Enviar revisión"

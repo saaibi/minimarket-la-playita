@@ -51,26 +51,43 @@ async function get(owner: string, path: string) {
   if (!r.ok) throw Error("No se pudo consultar el crédito");
   return r.json();
 }
+export type CheckoutDraft = {
+  clientId: string;
+  mode: string;
+  received: string;
+};
 export function Checkout({
   owner,
   lines,
   total,
   onSaved,
   onBusy,
+  draft,
+  onDraftChange,
 }: {
   owner: string;
   lines: OrderDraft["lines"];
   total: number;
   onSaved: () => void;
   onBusy: (busy: boolean) => void;
+  draft?: CheckoutDraft;
+  onDraftChange?: (draft: CheckoutDraft) => void;
 }) {
-  const [clients, setClients] = useState<any[]>([]),
-    [clientId, setClientId] = useState(""),
-    [mode, setMode] = useState("cash"),
-    [received, setReceived] = useState(""),
+  const [localDraft, setLocalDraft] = useState<CheckoutDraft>({
+      clientId: "",
+      mode: "cash",
+      received: "",
+    }),
+    [clients, setClients] = useState<any[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [attempt, setAttempt] = useState<Pending | null>(null);
+  const current = draft || localDraft,
+    { clientId, mode, received } = current,
+    update = onDraftChange || setLocalDraft;
+  const setClientId = (clientId: string) => update({ ...current, clientId }),
+    setMode = (mode: string) => update({ ...current, mode }),
+    setReceived = (received: string) => update({ ...current, received });
   useEffect(() => {
     void get(owner, "/credit/clients")
       .then(setClients)

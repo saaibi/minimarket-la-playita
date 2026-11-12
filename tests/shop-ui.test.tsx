@@ -155,7 +155,7 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
       );
       fireEvent.click(view.getByRole("button", { name: "+ Agregar" }));
       if (role !== "buyer") {
-        assert.equal(view.queryByLabelText("Ver canasta"), null);
+        assert.ok(view.getByLabelText("Ver canasta"));
         assert.equal(view.queryByRole("button", { name: /Canasta ·/ }), null);
       }
       fireEvent.click(
@@ -163,6 +163,21 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
       );
       assert.ok(view.getByRole("dialog"));
       assert.ok(view.getByText("Total"));
+      if (role !== "buyer") {
+        fireEvent.click(view.getByRole("button", { name: "A crédito" }));
+        fireEvent.click(view.getByRole("button", { name: "× Cerrar" }));
+        fireEvent.click(view.getByRole("button", { name: "Inventario" }));
+        fireEvent.click(view.getByLabelText("Ver canasta"));
+        assert.equal(
+          view
+            .getByRole("button", { name: "A crédito" })
+            .getAttribute("aria-pressed"),
+          "true",
+        );
+        assert.equal(view.queryByLabelText("Forma de pago"), null);
+        assert.ok(view.getByRole("button", { name: "Anotar a crédito" }));
+      }
+
       fireEvent.click(view.getByRole("button", { name: "× Cerrar" }));
       assert.equal(view.queryByRole("dialog"), null);
       fireEvent.click(view.getByRole("button", { name: "Notificaciones" }));

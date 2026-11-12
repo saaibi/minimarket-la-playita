@@ -4,7 +4,8 @@ import { Pool } from "pg";
 import { createApp } from "../apps/api/dist/app.js";
 import { bootstrapAdmin } from "../apps/api/src/auth.js";
 import { migrate } from "../scripts/migrate.js";
-import { bogotaDate } from "@playita/shared";
+import { bogotaDate, canonical } from "@playita/shared";
+import { createHash } from "node:crypto";
 const databaseUrl = process.env.TEST_DATABASE_URL;
 test(
   "PostgreSQL: módulos admin, auditoría, POS atómico, horario y avisos por usuario",
@@ -207,6 +208,17 @@ test(
       assert.equal(sale.data.status, "delivered");
       assert.equal(sale.data.paymentStatus, "paid");
       assert.equal(sale.data.channel, "pos");
+      // A pending POS replay from the previous APK keeps its original request hash.
+      const legacyHash = createHash("sha256")
+        .update(
+          canonical({ operation: "create-sale", draft, cashReceived: 15000 }),
+        )
+        .digest("hex");
+      await server.pool.query(
+        "UPDATE idempotency SET request_hash=$2 WHERE key=$1",
+        [saleKey, legacyHash],
+      );
+
       assert.equal(
         (
           await req(
@@ -721,6 +733,20 @@ test(
       );
       assert.equal(checkout.status, 201);
       assert.equal(checkout.data.cashChange, 0);
+      assert.equal(
+        (await req("/orders/" + checkout.data.id, registeredBuyer)).status,
+        200,
+      );
+      assert.equal(
+        (await req("/orders/" + checkout.data.id, otherBuyer)).status,
+        404,
+      );
+      assert.ok(
+        (await req("/orders", registeredBuyer)).data.some(
+          (o: any) => o.id === checkout.data.id,
+        ),
+      );
+
       assert.equal(
         (
           await req(

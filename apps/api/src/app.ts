@@ -44,7 +44,7 @@ class ApiController {
     try {
       const healthQuery = {
         text: "SELECT version FROM schema_migrations WHERE version = $1",
-        values: ["008_credit_authorization.sql"],
+        values: ["009_order_customer_link.sql"],
         query_timeout: 2500,
       };
       const result = await this.store.pool.query(healthQuery);
@@ -248,6 +248,7 @@ class ApiController {
       v.mode === "cash_and_payment"
         ? { clientId: v.clientId!, amountCop: v.abonoCop }
         : undefined,
+      v.clientId,
     );
     res.setHeader("Idempotency-Replayed", String(!!r.replayed));
     return res.status(r.status).json(r.body);

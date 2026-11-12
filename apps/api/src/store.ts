@@ -46,15 +46,15 @@ export class Store {
   }
   async list(actor: Actor) {
     const { rows } = await this.pool.query(
-      `SELECT id FROM orders WHERE NOT sale_removed ${actor.role === "buyer" ? "AND (owner_id=$1 OR id IN (SELECT order_id FROM credit_sales WHERE client_id=$1::uuid))" : ""} ORDER BY created_at DESC LIMIT 100`,
-      actor.role === "buyer" ? [actor.id] : [],
+      `SELECT id FROM orders WHERE NOT sale_removed ${actor.role === "buyer" ? "AND (owner_id=$1 OR customer_id=$2)" : ""} ORDER BY created_at DESC LIMIT 100`,
+      actor.role === "buyer" ? [actor.id, actor.id] : [],
     );
     return Promise.all(rows.map((o) => this.get(actor, o.id)));
   }
   async get(actor: Actor, id: string, db: Pool | PoolClient = this.pool) {
     const row = (
       await db.query(
-        'SELECT id,owner_id AS "ownerId",status,payment_method AS "paymentMethod",payment_status AS "paymentStatus",client_name AS "clientName",client_reference AS "clientReference",total_cop AS "totalCop",created_at AS "createdAt",channel,cash_received AS "cashReceived",cash_change AS "cashChange" FROM orders WHERE id=$1',
+        'SELECT id,owner_id AS "ownerId",customer_id AS "customerId",status,payment_method AS "paymentMethod",payment_status AS "paymentStatus",client_name AS "clientName",client_reference AS "clientReference",total_cop AS "totalCop",created_at AS "createdAt",channel,cash_received AS "cashReceived",cash_change AS "cashChange" FROM orders WHERE id=$1',
         [id],
       )
     ).rows[0];
@@ -67,6 +67,7 @@ export class Store {
     if (
       actor.role === "buyer" &&
       row.ownerId !== actor.id &&
+      row.customerId !== actor.id &&
       credit?.client_id !== actor.id
     )
       return null;
@@ -87,6 +88,7 @@ export class Store {
       db: PoolClient,
       events: Record<string, unknown>[],
     ) => Promise<Record<string, unknown>>,
+    compatibleInputs: unknown[] = [],
   ): Promise<Reply> {
     const db = await this.pool.connect(),
       hash = createHash("sha256").update(canonical(input)).digest("hex"),
@@ -104,7 +106,12 @@ export class Store {
       ).rows[0];
       if (prev) {
         await db.query("COMMIT");
-        return prev.request_hash === hash
+        return [
+          hash,
+          ...compatibleInputs.map((input) =>
+            createHash("sha256").update(canonical(input)).digest("hex"),
+          ),
+        ].includes(prev.request_hash)
           ? { status: prev.status_code, body: prev.response, replayed: true }
           : {
               status: 409,
@@ -169,6 +176,7 @@ export class Store {
     cashReceived?: number,
     creditClientId?: string,
     settlement?: { clientId: string; amountCop: number },
+    customerId?: string,
   ) {
     return this.once(
       actor,
@@ -176,7 +184,9 @@ export class Store {
       {
         operation: sale ? "create-sale" : "create-order",
         draft,
-        ...(sale ? { cashReceived, creditClientId, settlement } : {}),
+        ...(sale
+          ? { cashReceived, creditClientId, settlement, customerId }
+          : {}),
       },
       async (db, events) => {
         if (sale && (actor.role === "buyer" || draft.paymentMethod !== "cash"))
@@ -185,13 +195,13 @@ export class Store {
             "Venta directa solo personal y efectivo confirmado",
           );
         let creditClient;
-        if (creditClientId || settlement) {
+        if (creditClientId || settlement || customerId) {
           if (!sale || actor.role === "buyer")
             throw new Conflict("FORBIDDEN", "Solo personal");
           creditClient = (
             await db.query(
               "SELECT *,COALESCE(email,phone) AS name FROM app_users WHERE id=$1 AND active AND NOT is_guest FOR UPDATE",
-              [creditClientId || settlement?.clientId],
+              [creditClientId || settlement?.clientId || customerId],
             )
           ).rows[0];
           if (creditClientId && creditClient && !creditClient.credit_enabled)
@@ -289,7 +299,7 @@ export class Store {
           );
         const id = randomUUID();
         await db.query(
-          "INSERT INTO orders(id,owner_id,status,payment_method,payment_status,client_name,client_reference,total_cop,channel,cash_received,cash_change) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+          "INSERT INTO orders(id,owner_id,status,payment_method,payment_status,client_name,client_reference,total_cop,channel,cash_received,cash_change,customer_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
           [
             id,
             actor.id,
@@ -308,6 +318,7 @@ export class Store {
             sale && !creditClientId
               ? cashReceived! - total - (settlement?.amountCop || 0)
               : null,
+            creditClientId || settlement?.clientId || customerId || null,
           ],
         );
         if (creditClientId) {
@@ -429,6 +440,20 @@ export class Store {
         });
         return (await this.get(actor, id, db))!;
       },
+      sale
+        ? [
+            {
+              operation: "create-sale",
+              draft,
+              cashReceived,
+              creditClientId,
+              settlement,
+            },
+            ...(!creditClientId && !settlement && !customerId
+              ? [{ operation: "create-sale", draft, cashReceived }]
+              : []),
+          ]
+        : [],
     );
   }
   async creditClients() {
