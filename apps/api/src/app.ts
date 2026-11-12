@@ -44,7 +44,7 @@ class ApiController {
     try {
       const healthQuery = {
         text: "SELECT version FROM schema_migrations WHERE version = $1",
-        values: ["005_google_signin.sql"],
+        values: ["006_sale_removal.sql"],
         query_timeout: 2500,
       };
       const result = await this.store.pool.query(healthQuery);
@@ -184,6 +184,28 @@ class ApiController {
     );
     res.setHeader("Idempotency-Replayed", String(!!result.replayed));
     return res.status(result.status).json(result.body);
+  }
+  @Post("sales/:id/removal") async removeSale(
+    @Req() req: Request,
+    @Param("id") id: string,
+    @Body() body: unknown,
+    @Res() res: any,
+  ) {
+    if (!z.uuid().safeParse(id).success)
+      return res.status(400).json({ code: "INVALID_ID" });
+    return this.manage(
+      req,
+      res,
+      body,
+      z
+        .object({
+          removed: z.boolean(),
+          reason: z.string().trim().min(3).max(200),
+        })
+        .strict(),
+      (key, value) =>
+        this.store.removeSale(req.actor, key, id, value.removed, value.reason),
+    );
   }
   @Get("orders") orders(@Req() req: Request) {
     return this.store.list(req.actor);

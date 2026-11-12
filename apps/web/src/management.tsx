@@ -962,6 +962,31 @@ function AuditSettings({ api }: { api: Api }) {
                       : r.kind}
           </strong>
           <p>{r.reason}</p>
+          {r.kind === "sale.removed" && (
+            <Button
+              type="button"
+              onClick={() =>
+                void api("/sales/" + r.entityId + "/removal", {
+                  method: "POST",
+                  headers: { "Idempotency-Key": crypto.randomUUID() },
+                  body: JSON.stringify({
+                    removed: false,
+                    reason:
+                      "Restauración de registro de venta retirado; inventario sin cambios",
+                  }),
+                })
+                  .then(load)
+                  .catch(() =>
+                    setError(
+                      "No se pudo restaurar. Puede que el registro ya esté restaurado.",
+                    ),
+                  )
+              }
+            >
+              Restaurar registro de venta
+            </Button>
+          )}
+
           <small>
             {new Date(r.createdAt).toLocaleString("es-CO", {
               timeZone: "America/Bogota",

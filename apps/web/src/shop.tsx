@@ -91,6 +91,7 @@ export function Shop() {
     [bellOpen, setBellOpen] = useState(false),
     [noticeTab, setNoticeTab] = useState("orders"),
     [selected, setSelected] = useState<Order | null>(null),
+    [confirmRemoveSale, setConfirmRemoveSale] = useState(false),
     [search, setSearch] = useState(""),
     [orderFilter, setOrderFilter] = useState("active"),
     [busy, setBusy] = useState(false),
@@ -1147,6 +1148,79 @@ export function Shop() {
               {money((selected as any).cashChange || 0)}
             </p>
           )}
+          {admin &&
+            selected.status === "delivered" &&
+            selected.paymentStatus === "paid" &&
+            selected.paymentMethod === "cash" && (
+              <section className="panel">
+                <p>
+                  Retirar un registro de prueba lo excluye de Ventas y sus
+                  totales. El inventario no cambia y queda trazabilidad
+                  recuperable en Ajustes.
+                </p>
+                {!confirmRemoveSale ? (
+                  <Button
+                    type="button"
+                    onClick={() => setConfirmRemoveSale(true)}
+                  >
+                    Retirar venta de prueba
+                  </Button>
+                ) : (
+                  <>
+                    <p>
+                      ¿Retirar esta venta por {money(selected.totalCop)} sin
+                      cambiar el inventario?
+                    </p>
+                    <Button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void (async () => {
+                          setBusy(true);
+                          try {
+                            await request(
+                              "/sales/" + selected.id + "/removal",
+                              {
+                                method: "POST",
+                                headers: {
+                                  "Idempotency-Key": crypto.randomUUID(),
+                                },
+                                body: JSON.stringify({
+                                  removed: true,
+                                  reason:
+                                    "Retiro de venta ficticia autorizado por administrador; conservar inventario",
+                                }),
+                              },
+                            );
+                            setSelected(null);
+                            setConfirmRemoveSale(false);
+                            await reload();
+                            setMessage(
+                              "Venta de prueba retirada. El inventario conserva sus cantidades.",
+                            );
+                          } catch {
+                            setMessage(
+                              "No se pudo retirar el registro. Consulta el estado antes de reintentar.",
+                            );
+                          } finally {
+                            setBusy(false);
+                          }
+                        })()
+                      }
+                    >
+                      Confirmar retiro sin cambiar inventario
+                    </Button>
+                    <Button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => setConfirmRemoveSale(false)}
+                    >
+                      Conservar venta
+                    </Button>
+                  </>
+                )}
+              </section>
+            )}
           <p>
             Cliente: {selected.clientName}
             {selected.clientReference ? " · " + selected.clientReference : ""}

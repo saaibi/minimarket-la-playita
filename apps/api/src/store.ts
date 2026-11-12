@@ -46,7 +46,7 @@ export class Store {
   }
   async list(actor: Actor) {
     const { rows } = await this.pool.query(
-      `SELECT id FROM orders ${actor.role === "buyer" ? "WHERE owner_id=$1" : ""} ORDER BY created_at DESC LIMIT 100`,
+      `SELECT id FROM orders WHERE NOT sale_removed ${actor.role === "buyer" ? "AND owner_id=$1" : ""} ORDER BY created_at DESC LIMIT 100`,
       actor.role === "buyer" ? [actor.id] : [],
     );
     return Promise.all(rows.map((o) => this.get(actor, o.id)));
@@ -317,6 +317,59 @@ export class Store {
           productIds: ids,
         });
         return (await this.get(actor, id, db))!;
+      },
+    );
+  }
+  removeSale(
+    actor: Actor,
+    key: string,
+    id: string,
+    removed: boolean,
+    reason: string,
+  ) {
+    return this.once(
+      actor,
+      key,
+      { operation: "sale-removal", id, removed, reason },
+      async (db, events) => {
+        if (actor.role !== "admin")
+          throw new Conflict("FORBIDDEN", "Solo administrador");
+        const sale = (
+          await db.query("SELECT * FROM orders WHERE id=$1 FOR UPDATE", [id])
+        ).rows[0];
+        if (
+          !sale ||
+          sale.status !== "delivered" ||
+          sale.payment_status !== "paid" ||
+          sale.payment_method !== "cash"
+        )
+          throw new Conflict(
+            "SALE_UNAVAILABLE",
+            "Solo se puede retirar una venta de efectivo finalizada",
+          );
+        if (sale.sale_removed === removed)
+          throw new Conflict(
+            "SALE_ALREADY_UPDATED",
+            "El registro ya tiene ese estado",
+          );
+        await db.query("UPDATE orders SET sale_removed=$2 WHERE id=$1", [
+          id,
+          removed,
+        ]);
+        await this.audit(
+          db,
+          actor,
+          removed ? "sale.removed" : "sale.restored",
+          id,
+          { removed: sale.sale_removed, totalCop: sale.total_cop },
+          { removed, totalCop: sale.total_cop, inventoryChanged: false },
+          reason,
+        );
+        await this.event(db, events, "sale.updated", sale.owner_id, {
+          orderId: id,
+          removed,
+        });
+        return { id, removed, inventoryChanged: false };
       },
     );
   }

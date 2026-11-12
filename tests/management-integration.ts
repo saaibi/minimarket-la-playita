@@ -208,6 +208,74 @@ test(
       p = (await req("/inventory", admin)).data.find((x: any) => x.id === p.id);
       assert.equal(p.stock, 25);
       assert.equal(p.reserved, 15);
+      const beforeRemoval = (await req("/inventory", admin)).data;
+      const removalPath = "/sales/" + sale.data.id + "/removal";
+      const removal = {
+        removed: true,
+        reason: "Venta ficticia de prueba; inventario intacto",
+      };
+      assert.equal(
+        (await req(removalPath, buyer, "POST", removal)).status,
+        403,
+      );
+      assert.equal(
+        (await req(removalPath, seller, "POST", removal)).status,
+        403,
+      );
+      assert.equal(
+        (
+          await req(removalPath, admin, "POST", {
+            ...removal,
+            restoreStock: true,
+          })
+        ).status,
+        400,
+      );
+      const removalKey = crypto.randomUUID();
+      assert.equal(
+        (await req(removalPath, admin, "POST", removal, removalKey)).status,
+        201,
+      );
+      const replayRemoval = await req(
+        removalPath,
+        admin,
+        "POST",
+        removal,
+        removalKey,
+      );
+      assert.equal(replayRemoval.replayed, "true");
+      assert.equal(
+        (await req(removalPath, admin, "POST", removal)).status,
+        409,
+      );
+      assert.equal(
+        (await req("/orders", admin)).data.some(
+          (o: any) => o.id === sale.data.id,
+        ),
+        false,
+      );
+      assert.deepEqual((await req("/inventory", admin)).data, beforeRemoval);
+      assert.ok(
+        (await req("/audit", admin)).data.some(
+          (a: any) => a.kind === "sale.removed" && a.entityId === sale.data.id,
+        ),
+      );
+      assert.equal(
+        (
+          await req(removalPath, admin, "POST", {
+            removed: false,
+            reason: "Restaurar venta de prueba",
+          })
+        ).status,
+        201,
+      );
+      assert.ok(
+        (await req("/orders", admin)).data.some(
+          (o: any) => o.id === sale.data.id,
+        ),
+      );
+      assert.deepEqual((await req("/inventory", admin)).data, beforeRemoval);
+
       assert.equal(
         (await req("/sales", seller, "POST", { ...draft, cashReceived: 15000 }))
           .status,
