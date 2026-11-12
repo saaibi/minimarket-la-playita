@@ -125,6 +125,15 @@ test("Canasta: pago más abono muestra reparto y confirma una sola solicitud", a
     assert.equal(requests[0].body.abonoCop, 3000);
     assert.equal(requests[0].body.cashReceived, 10000);
     assert.equal(requests[0].body.clientId, clientId);
+    fireEvent.click(view.getByRole("button", { name: "A crédito" }));
+    assert.equal(
+      (
+        view.getByRole("button", {
+          name: "Anotar a crédito",
+        }) as HTMLButtonElement
+      ).disabled,
+      true,
+    );
   } finally {
     cleanup();
     auth.request = original;

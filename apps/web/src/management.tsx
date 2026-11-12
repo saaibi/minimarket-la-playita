@@ -877,6 +877,7 @@ function Clients({ api }: { api: Api }) {
       email: string | null;
       phone: string | null;
       active: boolean;
+      creditEnabled: boolean;
     }[]
   >([]);
   const [message, setMessage] = useState("Consultando clientes…");
@@ -897,6 +898,8 @@ function Clients({ api }: { api: Api }) {
       active = false;
     };
   }, []);
+  const [editing, setEditing] = useState<any>(null),
+    [saving, setSaving] = useState(false);
   return (
     <section className="panel staff-users">
       <h2>Clientes</h2>
@@ -908,10 +911,73 @@ function Clients({ api }: { api: Api }) {
         {accounts.map((c) => (
           <li key={c.id}>
             <strong>{c.email || c.phone || "Cliente"}</strong>
-            <small>{c.active ? "Activa" : "Desactivada"}</small>
+            <small>
+              {c.active ? "Activa" : "Desactivada"} · Crédito{" "}
+              {c.creditEnabled ? "habilitado" : "deshabilitado"}
+            </small>
+            <Button
+              type="button"
+              onClick={() =>
+                setEditing({ ...c, creditEnabled: !!c.creditEnabled })
+              }
+            >
+              Editar cliente
+            </Button>
           </li>
         ))}
       </ul>
+      {editing && (
+        <Modal
+          title="Editar cliente"
+          close={() => {
+            if (!saving) setEditing(null);
+          }}
+        >
+          <p>{editing.email || editing.phone}</p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setSaving(true);
+              void api("/auth/users/" + editing.id + "/credit", {
+                method: "POST",
+                body: JSON.stringify({ creditEnabled: editing.creditEnabled }),
+              })
+                .then(() => {
+                  setAccounts((list) =>
+                    list.map((c) =>
+                      c.id === editing.id
+                        ? { ...c, creditEnabled: editing.creditEnabled }
+                        : c,
+                    ),
+                  );
+                  setEditing(null);
+                })
+                .catch(() =>
+                  setMessage("No se pudo guardar el permiso de crédito"),
+                )
+                .finally(() => setSaving(false));
+            }}
+          >
+            <label className="check">
+              <Input
+                type="checkbox"
+                checked={!!editing.creditEnabled}
+                onChange={(e) =>
+                  setEditing({ ...editing, creditEnabled: e.target.checked })
+                }
+              />
+              Permitir compras a crédito
+            </label>
+            <p>
+              Deshabilitarlo impide nuevos créditos y conserva la deuda y los
+              abonos anteriores.
+            </p>
+            <Button type="submit" disabled={saving}>
+              Guardar cliente
+            </Button>
+          </form>
+        </Modal>
+      )}
       <h3>Contactos guardados</h3>
       {!message && !contacts.length && <p>No hay contactos guardados.</p>}
       <ul className="customer-list">
@@ -949,17 +1015,21 @@ function AuditSettings({ api }: { api: Api }) {
       {rows.map((r) => (
         <article className="audit" key={r.id}>
           <strong>
-            {r.kind === "stock.adjusted"
-              ? "Ajuste de existencias y precios"
-              : r.kind === "sale"
-                ? "Venta de caja"
-                : r.kind === "product.created"
-                  ? "Producto creado"
-                  : r.kind === "product.updated"
-                    ? "Producto editado"
-                    : r.kind === "schedule"
-                      ? "Horario actualizado"
-                      : r.kind}
+            {r.kind === "account.credit"
+              ? "Permiso de crédito"
+              : r.kind === "account.role"
+                ? "Cuenta y rol"
+                : r.kind === "stock.adjusted"
+                  ? "Ajuste de existencias y precios"
+                  : r.kind === "sale"
+                    ? "Venta de caja"
+                    : r.kind === "product.created"
+                      ? "Producto creado"
+                      : r.kind === "product.updated"
+                        ? "Producto editado"
+                        : r.kind === "schedule"
+                          ? "Horario actualizado"
+                          : r.kind}
           </strong>
           <p>{r.reason}</p>
           {r.kind === "sale.removed" && (

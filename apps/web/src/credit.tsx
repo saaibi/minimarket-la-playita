@@ -146,7 +146,7 @@ export function Checkout({
             {mode === "cash" ? "Cliente general" : "Selecciona una cuenta"}
           </option>
           {clients
-            .filter((c) => c.active)
+            .filter((c) => c.active && (mode !== "credit" || c.creditEnabled))
             .map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -203,6 +203,12 @@ export function Checkout({
           abonará a sus pedidos más antiguos.
         </p>
       )}
+      {mode === "credit" && client && !client.creditEnabled && (
+        <p>
+          Este cliente no tiene crédito habilitado. Debe autorizarlo un
+          administrador.
+        </p>
+      )}
       {mode === "credit" && (
         <p>
           Confirma después de entregar los productos. No registra efectivo
@@ -235,6 +241,7 @@ export function Checkout({
             busy ||
             !lines.length ||
             (mode !== "cash" && !clientId) ||
+            (mode === "credit" && !client?.creditEnabled) ||
             (mode !== "credit" &&
               (!Number.isSafeInteger(cash) || cash < total)) ||
             (mode === "cash_and_payment" && abono <= 0)
@@ -333,6 +340,9 @@ export function Credits({
         {clients.map((c) => (
           <article className="panel" key={c.id}>
             <h2>{c.name}</h2>
+            <small>
+              Crédito {c.creditEnabled ? "habilitado" : "deshabilitado"}
+            </small>
             <small>{c.contact}</small>
             <p>
               Debe: <strong>{money(c.balanceCop)}</strong>

@@ -189,6 +189,11 @@ export class Store {
               [creditClientId || settlement?.clientId],
             )
           ).rows[0];
+          if (creditClientId && creditClient && !creditClient.credit_enabled)
+            throw new Conflict(
+              "CREDIT_DISABLED",
+              "Esta cuenta no tiene crédito habilitado",
+            );
           if (!creditClient)
             throw new Conflict(
               "CLIENT_UNAVAILABLE",
@@ -424,7 +429,7 @@ export class Store {
   async creditClients() {
     return (
       await this.pool
-        .query(`SELECT c.id,COALESCE(c.email,c.phone) AS name,'' AS contact,c.active,
+        .query(`SELECT c.id,COALESCE(c.email,c.phone) AS name,'' AS contact,c.active,c.credit_enabled AS \"creditEnabled\",
       COALESCE((SELECT SUM(o.total_cop) FROM credit_sales s JOIN orders o ON o.id=s.order_id WHERE s.client_id=c.id),0)::bigint AS "chargedCop",
       COALESCE((SELECT SUM(p.amount_cop) FROM credit_payments p JOIN credit_sales s ON s.order_id=p.order_id WHERE s.client_id=c.id),0)::bigint AS "paidCop"
       FROM app_users c WHERE NOT c.is_guest ORDER BY c.created_at`)

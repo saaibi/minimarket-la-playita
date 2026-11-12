@@ -1964,6 +1964,10 @@
                   },
                   "role": {
                     "enum": ["admin", "seller", "buyer"]
+                  },
+                  "creditEnabled": {
+                    "type": "boolean",
+                    "description": "Permiso explícito de crédito. Nuevo usuario: false por defecto; omitido en cuenta existente conserva valor."
                   }
                 }
               }
@@ -2071,7 +2075,7 @@
     },
     "/credit/clients": {
       "get": {
-        "description": "Administrador y vendedor: cuentas registradas, no invitados. Saldos chargedCop, paidCop, balanceCop. Incluye cuentas inactivas para conservar cobro; solo activas admiten crédito nuevo.",
+        "description": "Administrador y vendedor: cuentas registradas, no invitados. Saldos chargedCop, paidCop, balanceCop. Incluye cuentas inactivas para conservar cobro; solo activas admiten crédito nuevo. Incluye creditEnabled; solo cuenta activa con crédito habilitado admite nuevos créditos. Cuentas sin permiso conservan deuda/abonos.",
         "responses": {
           "200": {
             "description": "Cuentas y saldos"
@@ -2346,6 +2350,56 @@
           },
           "409": {
             "description": "Cliente inactivo, invitado, saldo, precio o stock cambió: revisar antes de reenviar"
+          }
+        }
+      }
+    },
+    "/auth/users/{id}/credit": {
+      "post": {
+        "description": "Solo administrador. Activa/desactiva crédito de una cuenta no invitada. No cambia deuda ni impide abonos anteriores; los nuevos créditos requieren además cuenta activa. Deja auditoría account.credit.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["creditEnabled"],
+                "properties": {
+                  "creditEnabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Permiso guardado"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "401": {
+            "description": "Sin sesión"
+          },
+          "403": {
+            "description": "Solo administrador"
+          },
+          "404": {
+            "description": "Cuenta no encontrada o invitada"
           }
         }
       }

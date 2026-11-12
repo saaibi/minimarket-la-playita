@@ -5,12 +5,19 @@ import React from "react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { auth, useSession } from "./session.js";
-type Staff = { id: string; email: string; role: string; active: boolean };
+type Staff = {
+  id: string;
+  email: string;
+  role: string;
+  active: boolean;
+  creditEnabled: boolean;
+};
 export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
   const session = useSession()!,
     [users, setUsers] = useState<Staff[]>([]),
     [email, setEmail] = useState(""),
     [role, setRole] = useState("seller"),
+    [creditEnabled, setCreditEnabled] = useState(false),
     [message, setMessage] = useState("");
   async function load() {
     const r = await auth.request("/auth/users");
@@ -30,7 +37,7 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
         Asigna un correo y su rol. La persona ingresará con su cuenta de Google.
       </p>
       <section className="panel">
-        <h2>Asignar rol</h2>
+        <h2>Crear o editar cuenta</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -38,11 +45,14 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
               try {
                 const r = await auth.request("/auth/users/assign-role", {
                   method: "POST",
-                  body: JSON.stringify({ email, role }),
+                  body: JSON.stringify({ email, role, creditEnabled }),
                 });
                 if (!r.ok) throw Error();
                 setEmail("");
-                setMessage("Rol guardado. Se aplicará al ingresar con Google.");
+                setCreditEnabled(false);
+                setMessage(
+                  "Cuenta guardada. El rol y el permiso de crédito están actualizados.",
+                );
                 await load();
               } catch {
                 setMessage(
@@ -70,7 +80,15 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
               <option value="buyer">Comprador</option>
             </Select>
           </label>
-          <Button>Guardar rol</Button>
+          <label className="check">
+            <Input
+              type="checkbox"
+              checked={creditEnabled}
+              onChange={(e) => setCreditEnabled(e.target.checked)}
+            />
+            Permitir compras a crédito
+          </label>
+          <Button>Guardar cuenta</Button>
         </form>
       </section>
       <section className="panel">
@@ -89,9 +107,10 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
                 onClick={() => {
                   setEmail(u.email);
                   setRole(u.role);
+                  setCreditEnabled(!!u.creditEnabled);
                 }}
               >
-                Cambiar rol
+                Editar cuenta
               </Button>
               <Button
                 disabled={!u.active || u.id === session.actor.id}

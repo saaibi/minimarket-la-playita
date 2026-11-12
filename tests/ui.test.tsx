@@ -116,7 +116,7 @@ test("React DOM: acceso, invitado/social deshabilitado, rutas protegidas y alta 
       </MemoryRouter>,
     );
     await waitFor(() =>
-      assert.ok(view.getByRole("button", { name: "Guardar rol" })),
+      assert.ok(view.getByRole("button", { name: "Guardar cuenta" })),
     );
     fireEvent.change(view.getByLabelText("Correo"), {
       target: { value: "staff@example.invalid" },
@@ -124,15 +124,19 @@ test("React DOM: acceso, invitado/social deshabilitado, rutas protegidas y alta 
     fireEvent.change(view.getByLabelText("Rol"), {
       target: { value: "seller" },
     });
+    fireEvent.click(
+      view.getByRole("checkbox", { name: "Permitir compras a crédito" }),
+    );
     fireEvent.submit(
-      view.getByRole("button", { name: "Guardar rol" }).closest("form")!,
+      view.getByRole("button", { name: "Guardar cuenta" }).closest("form")!,
     );
     await waitFor(() =>
       assert.ok(
         requests.some(
           (r) =>
             r.path.endsWith("/auth/users/assign-role") &&
-            r.body?.role === "seller",
+            r.body?.role === "seller" &&
+            r.body?.creditEnabled === true,
         ),
       ),
     );

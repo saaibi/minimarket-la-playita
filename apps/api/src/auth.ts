@@ -620,7 +620,7 @@ export class AuthService {
         return res.json(
           (
             await this.pool.query(
-              "SELECT id,email,phone,active,created_at AS \"createdAt\" FROM app_users WHERE role='buyer' AND NOT is_guest ORDER BY created_at",
+              'SELECT id,email,phone,active,credit_enabled AS "creditEnabled",created_at AS "createdAt" FROM app_users WHERE role=\'buyer\' AND NOT is_guest ORDER BY created_at',
             )
           ).rows,
         );
@@ -629,7 +629,11 @@ export class AuthService {
         const s = await this.protect(req);
         if (s.actor.role !== "admin") throw new AuthError(403, "FORBIDDEN");
         const input = z
-          .object({ email, role: z.enum(["admin", "seller", "buyer"]) })
+          .object({
+            email,
+            role: z.enum(["admin", "seller", "buyer"]),
+            creditEnabled: z.boolean().optional(),
+          })
           .strict()
           .parse(body);
         const db = await this.pool.connect();
@@ -659,14 +663,19 @@ export class AuthService {
           const user = existing
             ? (
                 await db.query(
-                  "UPDATE app_users SET role=$2 WHERE id=$1 RETURNING id,email,role,active",
-                  [existing.id, input.role],
+                  'UPDATE app_users SET role=$2,credit_enabled=COALESCE($3,credit_enabled) WHERE id=$1 RETURNING id,email,role,active,credit_enabled AS "creditEnabled"',
+                  [existing.id, input.role, input.creditEnabled ?? null],
                 )
               ).rows[0]
             : (
                 await db.query(
-                  "INSERT INTO app_users(id,email,role) VALUES($1,$2,$3) RETURNING id,email,role,active",
-                  [randomUUID(), input.email, input.role],
+                  'INSERT INTO app_users(id,email,role,credit_enabled) VALUES($1,$2,$3,$4) RETURNING id,email,role,active,credit_enabled AS "creditEnabled"',
+                  [
+                    randomUUID(),
+                    input.email,
+                    input.role,
+                    input.creditEnabled ?? false,
+                  ],
                 )
               ).rows[0];
           if (existing && existing.role !== input.role) {
@@ -683,12 +692,64 @@ export class AuthService {
             [
               s.actor.id,
               user.id,
-              existing ? JSON.stringify({ role: existing.role }) : null,
-              JSON.stringify({ role: user.role }),
+              existing
+                ? JSON.stringify({
+                    role: existing.role,
+                    creditEnabled: existing.credit_enabled,
+                  })
+                : null,
+              JSON.stringify({
+                role: user.role,
+                creditEnabled: user.creditEnabled,
+              }),
             ],
           );
           await db.query("COMMIT");
           return res.status(existing ? 200 : 201).json(user);
+        } catch (e) {
+          await db.query("ROLLBACK");
+          throw e;
+        } finally {
+          db.release();
+        }
+      }
+      if (
+        req.method === "POST" &&
+        /^\/auth\/users\/[^/]+\/credit$/.test(path)
+      ) {
+        const session = await this.protect(req);
+        if (session.actor.role !== "admin")
+          throw new AuthError(403, "FORBIDDEN");
+        const id = z.uuid().parse(path.split("/")[3]);
+        const input = z
+          .object({ creditEnabled: z.boolean() })
+          .strict()
+          .parse(body);
+        const db = await this.pool.connect();
+        try {
+          await db.query("BEGIN");
+          const user = (
+            await db.query(
+              "SELECT id,credit_enabled,is_guest FROM app_users WHERE id=$1 FOR UPDATE",
+              [id],
+            )
+          ).rows[0];
+          if (!user || user.is_guest) throw new AuthError(404, "NOT_FOUND");
+          await db.query("UPDATE app_users SET credit_enabled=$2 WHERE id=$1", [
+            id,
+            input.creditEnabled,
+          ]);
+          await db.query(
+            "INSERT INTO inventory_audit(actor_id,kind,entity_id,before_data,after_data,reason) VALUES($1,'account.credit',$2,$3,$4,'Permiso de crédito por administrador')",
+            [
+              session.actor.id,
+              id,
+              JSON.stringify({ creditEnabled: user.credit_enabled }),
+              JSON.stringify(input),
+            ],
+          );
+          await db.query("COMMIT");
+          return res.json({ id, ...input });
         } catch (e) {
           await db.query("ROLLBACK");
           throw e;
@@ -703,7 +764,7 @@ export class AuthService {
           return res.json(
             (
               await this.pool.query(
-                "SELECT id,email,role,active FROM app_users WHERE role IN ('admin','seller') ORDER BY created_at",
+                "SELECT id,email,role,active,credit_enabled AS \"creditEnabled\" FROM app_users WHERE role IN ('admin','seller') ORDER BY created_at",
               )
             ).rows,
           );

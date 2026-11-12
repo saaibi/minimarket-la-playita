@@ -505,6 +505,32 @@ test(
         ).status,
         409,
       );
+      assert.equal(
+        (await req("/credit/sales", seller, "POST", creditDraft)).data.code,
+        "CREDIT_DISABLED",
+      );
+      const permissionPath = "/auth/users/" + creditCustomer.id + "/credit";
+      assert.equal(
+        (await req(permissionPath, seller, "POST", { creditEnabled: true }))
+          .status,
+        403,
+      );
+      assert.equal(
+        (await req(permissionPath, buyer, "POST", { creditEnabled: true }))
+          .status,
+        403,
+      );
+      assert.equal(
+        (await req(permissionPath, admin, "POST", { creditEnabled: true }))
+          .status,
+        200,
+      );
+      assert.equal(
+        (await req("/credit/clients", seller)).data.find(
+          (c: any) => c.id === creditCustomer.id,
+        ).creditEnabled,
+        true,
+      );
       const ck = crypto.randomUUID();
       const credit = await req(
         "/credit/sales",
@@ -548,6 +574,15 @@ test(
       assert.equal(
         (await req(payPath, seller, "POST", { amountCop: 500 }, pk)).replayed,
         "true",
+      );
+      assert.equal(
+        (await req(permissionPath, admin, "POST", { creditEnabled: false }))
+          .status,
+        200,
+      );
+      assert.equal(
+        (await req("/credit/sales", seller, "POST", creditDraft)).data.code,
+        "CREDIT_DISABLED",
       );
       const concurrent = await Promise.all([
         req(payPath, seller, "POST", { amountCop: 1000 }),
@@ -597,11 +632,13 @@ test(
       await server.pool.query("UPDATE app_users SET active=true WHERE id=$1", [
         creditCustomer.id,
       ]);
+      await req(permissionPath, admin, "POST", { creditEnabled: true });
       const secondCredit = await req("/credit/sales", seller, "POST", {
         ...creditDraft,
         lines: [{ productId: cp.id, quantity: 1, expectedPriceCop: 1000 }],
       });
       assert.equal(secondCredit.status, 201);
+      await req(permissionPath, admin, "POST", { creditEnabled: false });
       const checkoutPayload = {
         mode: "cash_and_payment",
         clientId: creditCustomer.id,
