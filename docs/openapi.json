@@ -2198,7 +2198,7 @@
     },
     "/credit/checkout": {
       "post": {
-        "description": "Personal: un campo de efectivo. En auto se valida expectedTotalCop y, para cuenta seleccionada, expectedBalanceCop. Cero: crédito total; pago inferior al total: pago inicial y crédito restante; exacto: compra pagada; excedente: abono a deuda y después cambio. Cualquier saldo nuevo requiere crédito habilitado. Todo atómico, idempotente y protegido por bloqueos; conflicto revierte venta y pagos. Los modos anteriores permanecen para reintentar solicitudes ya guardadas.",
+        "description": "Personal: un campo de efectivo. En auto se valida expectedTotalCop y, para cuenta seleccionada, expectedBalanceCop. Cero: crédito total; pago inferior al total: pago inicial y crédito restante; exacto: compra pagada; excedente: abono a deuda y después cambio. Cualquier saldo nuevo requiere crédito habilitado. Todo atómico, idempotente y protegido por bloqueos; conflicto revierte venta y pagos. Los modos anteriores permanecen para reintentar solicitudes ya guardadas. Para Cliente general y cuenta sin crédito habilitado solo se registra pago completo y cambio; los abonos a deuda histórica deshabilitada se registran explícitamente desde Créditos. El permiso esperado se compara bajo bloqueo para impedir cambiar silenciosamente el reparto.",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -2279,6 +2279,10 @@
                     "type": "integer",
                     "minimum": 0,
                     "description": "Saldo visto al confirmar; obligatorio en auto si hay clientId."
+                  },
+                  "expectedCreditEnabled": {
+                    "type": "boolean",
+                    "description": "Permiso mostrado al confirmar. Si cambia bajo bloqueo, se rechaza para revisar."
                   }
                 },
                 "required": ["lines"],

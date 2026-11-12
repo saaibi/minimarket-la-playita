@@ -1248,3 +1248,30 @@ label .MuiInputBase-root {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+.cash-feedback {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+.cash-feedback p {
+  margin: 0;
+}
+.cash-feedback strong {
+  font-size: 1.25rem;
+}
+.cash-feedback.shortage {
+  color: #9b1c1c;
+  background: #fff0ee;
+  border-color: #efaaa4;
+}
+.cash-feedback.change {
+  color: var(--green);
+  background: #eaf3e7;
+  border-color: #a4c0a0;
+}
+.cash-feedback.neutral {
+  color: var(--muted);
+  background: #f4f6f1;
+}

@@ -83,6 +83,7 @@ test("Canasta: pago más abono muestra reparto y confirma una sola solicitud", a
           id: clientId,
           name: "cliente@example.invalid",
           active: true,
+          creditEnabled: true,
           balanceCop: 5000,
         },
       ]);
@@ -130,17 +131,6 @@ test("Canasta: pago más abono muestra reparto y confirma una sola solicitud", a
     assert.equal(requests[0].body.expectedBalanceCop, 5000);
     assert.equal(requests[0].body.cashReceived, 10000);
     assert.equal(requests[0].body.clientId, clientId);
-    fireEvent.change(view.getByLabelText("Efectivo recibido (COP)"), {
-      target: { value: "0" },
-    });
-    assert.equal(
-      (
-        view.getByRole("button", {
-          name: /Anotar a crédito/,
-        }) as HTMLButtonElement
-      ).disabled,
-      true,
-    );
   } finally {
     cleanup();
     auth.request = original;
@@ -224,6 +214,93 @@ test("Créditos: solo habilitados por defecto, búsqueda y deudas deshabilitadas
     });
     assert.ok(view.getByRole("heading", { name: "carla@example.invalid" }));
     assert.equal(writes, 0);
+  } finally {
+    cleanup();
+    auth.request = original;
+    dom.window.close();
+  }
+});
+test("Contado: general y cuenta sin crédito muestran faltante o cambio sin abonar deuda", async () => {
+  const dom = new JSDOM("<html><body></body></html>", {
+    url: "http://localhost",
+  });
+  Object.assign(globalThis, {
+    window: dom.window,
+    document: dom.window.document,
+    HTMLElement: dom.window.HTMLElement,
+    localStorage: dom.window.localStorage,
+    IS_REACT_ACT_ENVIRONMENT: true,
+  });
+  const React = await import("react"),
+    { render, fireEvent, waitFor, cleanup } =
+      await import("@testing-library/react"),
+    { auth } = await import("../apps/web/src/session.js"),
+    { Checkout } = await import("../apps/web/src/credit.js");
+  const original = auth.request,
+    clientId = crypto.randomUUID();
+  const writes: any[] = [];
+  auth.request = async (_path, init) => {
+    if (!init?.method)
+      return Response.json([
+        {
+          id: clientId,
+          name: "contado@example.invalid",
+          active: true,
+          creditEnabled: false,
+          balanceCop: 5000,
+        },
+      ]);
+    writes.push(JSON.parse(String(init.body)));
+    return Response.json({ id: "paid" }, { status: 201 });
+  };
+  try {
+    const view = render(
+      React.createElement(Checkout, {
+        owner: "cash-only-test",
+        lines: [
+          {
+            productId: crypto.randomUUID(),
+            quantity: 1,
+            expectedPriceCop: 7000,
+          },
+        ],
+        total: 7000,
+        onBusy: () => {},
+        onSaved: () => {},
+      }),
+    );
+    await waitFor(() =>
+      assert.ok(view.getByRole("option", { name: "contado@example.invalid" })),
+    );
+    fireEvent.change(view.getByLabelText("Efectivo recibido (COP)"), {
+      target: { value: "5000" },
+    });
+    assert.ok(
+      view.getByText(/^Faltan:/).parentElement?.classList.contains("shortage"),
+    );
+    assert.equal(
+      (
+        view.getByRole("button", {
+          name: "Confirmar pago",
+        }) as HTMLButtonElement
+      ).disabled,
+      true,
+    );
+    fireEvent.change(view.getByRole("combobox"), {
+      target: { value: clientId },
+    });
+    fireEvent.change(view.getByLabelText("Efectivo recibido (COP)"), {
+      target: { value: "10000" },
+    });
+    assert.ok(view.getByText(/^Cambio:/).textContent?.includes("3.000"));
+    assert.ok(
+      view.getByText(/^Cambio:/).parentElement?.classList.contains("change"),
+    );
+    assert.equal(view.queryByText(/^Nuevo crédito:/), null);
+    assert.equal(view.queryByText(/^Abono a deuda anterior:/), null);
+    fireEvent.click(view.getByRole("button", { name: "Confirmar pago" }));
+    await waitFor(() => assert.equal(writes.length, 1));
+    assert.equal(writes[0].expectedCreditEnabled, false);
   } finally {
     cleanup();
     auth.request = original;

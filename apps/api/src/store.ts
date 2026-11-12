@@ -177,7 +177,11 @@ export class Store {
     creditClientId?: string,
     settlement?: { clientId: string; amountCop: number },
     customerId?: string,
-    checkout?: { expectedTotalCop: number; expectedBalanceCop: number },
+    checkout?: {
+      expectedTotalCop: number;
+      expectedBalanceCop: number;
+      expectedCreditEnabled?: boolean;
+    },
   ) {
     return this.once(
       actor,
@@ -217,6 +221,15 @@ export class Store {
             );
         }
         if (checkout && creditClient) {
+          if (
+            checkout.expectedCreditEnabled !== undefined &&
+            creditClient.credit_enabled !== checkout.expectedCreditEnabled
+          )
+            throw new Conflict(
+              "CREDIT_PERMISSION_CHANGED",
+              "El permiso de crédito cambió. Actualiza la cuenta antes de confirmar",
+            );
+
           const debts = (
             await db.query(
               "SELECT o.id,o.total_cop FROM orders o JOIN credit_sales s ON s.order_id=o.id WHERE s.client_id=$1 ORDER BY o.created_at,o.id FOR UPDATE OF o",

@@ -208,6 +208,7 @@ class ApiController {
             .max(2000000000)
             .optional(),
           abonoCop: z.number().int().nonnegative().max(2000000000).default(0),
+          expectedCreditEnabled: z.boolean().optional(),
           expectedTotalCop: z
             .number()
             .int()
@@ -236,20 +237,37 @@ class ApiController {
         (!v.clientId && (v.expectedBalanceCop || 0) !== 0))
     )
       return res.status(400).json({ code: "VALIDATION_ERROR" });
+    let client;
+    if (v.clientId) {
+      client = (
+        await this.store.pool.query(
+          'SELECT COALESCE(email,phone) AS name,credit_enabled AS "creditEnabled" FROM app_users WHERE id=$1 AND active AND NOT is_guest',
+          [v.clientId],
+        )
+      ).rows[0];
+      if (!client)
+        return res.status(409).json({
+          code: "CLIENT_UNAVAILABLE",
+          message: "Selecciona una cuenta registrada y activa",
+        });
+    }
     const mode = automatic
       ? v.cashReceived! < v.expectedTotalCop!
         ? "credit"
         : v.clientId &&
+            client?.creditEnabled &&
             v.cashReceived! > v.expectedTotalCop! &&
             (v.expectedBalanceCop || 0) > 0
           ? "cash_and_payment"
           : "cash"
       : v.mode;
     const abono = automatic
-      ? Math.min(
-          Math.max(0, v.cashReceived! - v.expectedTotalCop!),
-          v.expectedBalanceCop || 0,
-        )
+      ? client?.creditEnabled
+        ? Math.min(
+            Math.max(0, v.cashReceived! - v.expectedTotalCop!),
+            v.expectedBalanceCop || 0,
+          )
+        : 0
       : v.abonoCop;
     if (
       (mode !== "cash" && !v.clientId) ||
@@ -257,28 +275,10 @@ class ApiController {
       (!automatic && mode !== "cash_and_payment" && abono !== 0) ||
       (mode !== "credit" && v.cashReceived === undefined)
     )
-      return res
-        .status(400)
-        .json({
-          code: "VALIDATION_ERROR",
-          message: "Selecciona una cuenta para registrar saldo a crédito",
-        });
-    let client;
-    if (v.clientId) {
-      client = (
-        await this.store.pool.query(
-          "SELECT COALESCE(email,phone) AS name FROM app_users WHERE id=$1 AND active AND NOT is_guest",
-          [v.clientId],
-        )
-      ).rows[0];
-      if (!client)
-        return res
-          .status(409)
-          .json({
-            code: "CLIENT_UNAVAILABLE",
-            message: "Selecciona una cuenta registrada y activa",
-          });
-    }
+      return res.status(400).json({
+        code: "VALIDATION_ERROR",
+        message: "Selecciona una cuenta para registrar saldo a crédito",
+      });
     const r = await this.store.create(
       req.actor,
       id.data,
@@ -298,6 +298,7 @@ class ApiController {
         ? {
             expectedTotalCop: v.expectedTotalCop!,
             expectedBalanceCop: v.expectedBalanceCop || 0,
+            expectedCreditEnabled: v.expectedCreditEnabled,
           }
         : undefined,
     );

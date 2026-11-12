@@ -6,7 +6,7 @@ Las cuentas compradoras, vendedoras y administradoras pueden recibir crédito. D
 
 La misma canasta funciona en todos los módulos del personal y conserva cliente y efectivo al cerrar/reabrir. El ícono superior aparece también en Caja; se elimina solo el botón extra del listado. El banner verde permanece fijo. Los compradores conservan su flujo de pedido.
 
-Hay un único campo Efectivo recibido. Sean T los productos, D la deuda anterior y C el efectivo:
+Hay un único campo Efectivo recibido. Para una cuenta con crédito habilitado, sean T los productos, D la deuda anterior y C el efectivo:
 
 - Pago de la compra = min(C,T).
 - Nuevo crédito = max(T-C,0), con permiso obligatorio para dejar cualquier saldo nuevo.
@@ -14,7 +14,7 @@ Hay un único campo Efectivo recibido. Sean T los productos, D la deuda anterior
 - Cambio = max(C-T-D,0).
 - Saldo final = D + nuevo crédito - abono anterior.
 
-C=0 deja toda la compra a crédito; un pago parcial crea crédito solo por el resto y deja el pago inicial anotado. El resumen muestra permiso, deuda actual, productos, pago de compra, nuevo crédito, abono, cambio y saldo posterior antes de confirmar. Si hay deuda, se explica que el excedente abona esa deuda antes de devolver cambio. Sin cliente registrado solo se admite pago completo.
+C=0 deja toda la compra a crédito; un pago parcial crea crédito solo por el resto y deja el pago inicial anotado. El resumen muestra permiso, deuda actual, productos, pago de compra, nuevo crédito, abono, cambio y saldo posterior antes de confirmar. Si hay deuda, se explica que el excedente abona esa deuda antes de devolver cambio. Cliente general y cuentas sin crédito habilitado se cobran de contado: solo muestran faltante rojo o cambio verde. No reciben crédito ni abonos automáticos a deuda anterior desde esa canasta; las deudas históricas siguen cobrables desde Créditos > Saldos pendientes. Sin cliente registrado solo se admite pago completo.
 
 El servidor verifica total, precio, stock, permiso y saldo con bloqueo. Venta, pago inicial y abonos se guardan en una sola transacción; cualquier conflicto revierte todo. El efectivo se registra manualmente después de recibirlo; no se ejecutan pagos externos ni se cobran intereses. Los abonos no modifican inventario. Los créditos no pueden retirarse como ventas de prueba.
 
@@ -32,4 +32,4 @@ Escrituras con Idempotency-Key. El cuerpo y la clave se guardan localmente por u
 
 Pruebas: elegibilidad de los tres roles; permiso admin; rechazo de invitado/contacto/inactivo/no habilitado; crédito completo, parcial, pago exacto, abono y cambio; abonos concurrentes; snapshot de productos; aislamiento entre compradores; compras pagadas en historial propio; rollback íntegro por saldo/total/stock; reintentos y versiones previas; canasta igual entre módulos; filtros sin escrituras. Las pruebas PostgreSQL se ejecutan en CI con datos aislados, sin registrar operaciones financieras ficticias en producción.
 
-El endpoint conserva los modos antiguos por compatibilidad con intentos pendientes; la interfaz nueva utiliza mode=auto, cashReceived, expectedTotalCop y expectedBalanceCop. Un cambio del saldo o total respecto al resumen obliga a actualizar y revisar antes de confirmar.
+El endpoint conserva los modos antiguos por compatibilidad con intentos pendientes; la interfaz nueva utiliza mode=auto, cashReceived, expectedTotalCop y expectedBalanceCop. Se envía también expectedCreditEnabled para detectar cambios del permiso. Un cambio del permiso, saldo o total respecto al resumen obliga a actualizar y revisar antes de confirmar.

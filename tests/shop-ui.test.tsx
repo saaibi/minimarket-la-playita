@@ -176,7 +176,14 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
           "0",
         );
         assert.equal(view.queryByLabelText("Forma de pago"), null);
-        assert.ok(view.getByRole("button", { name: /Anotar a crédito/ }));
+        assert.equal(
+          (
+            view.getByRole("button", {
+              name: "Confirmar pago",
+            }) as HTMLButtonElement
+          ).disabled,
+          true,
+        );
       }
 
       fireEvent.click(view.getByRole("button", { name: "× Cerrar" }));

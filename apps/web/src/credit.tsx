@@ -115,7 +115,9 @@ export function Checkout({
     balance = client?.balanceCop || 0,
     cash = Number(received),
     newCredit = Math.max(0, total - cash),
-    abono = Math.min(Math.max(0, cash - total), balance),
+    abono = client?.creditEnabled
+      ? Math.min(Math.max(0, cash - total), balance)
+      : 0,
     change = Math.max(0, cash - total - abono),
     paidNow = Math.min(Math.max(0, cash), total),
     futureBalance = balance + newCredit - abono;
@@ -134,6 +136,7 @@ export function Checkout({
               cashReceived: cash,
               expectedTotalCop: total,
               expectedBalanceCop: balance,
+              expectedCreditEnabled: !!client?.creditEnabled,
             };
       await creditMutation(owner, "/credit/checkout", payload);
       onSaved();
@@ -148,7 +151,7 @@ export function Checkout({
   return (
     <section className="checkout">
       <label>
-        Cliente (obligatorio si queda saldo pendiente)
+        Cliente (opcional)
         <Select
           value={clientId}
           disabled={busy || !!attempt || loading}
@@ -156,11 +159,7 @@ export function Checkout({
         >
           <option value="">Cliente general</option>
           {clients
-            .filter(
-              (c) =>
-                c.active &&
-                (received === "" || newCredit === 0 || c.creditEnabled),
-            )
+            .filter((c) => c.active)
             .map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -186,64 +185,74 @@ export function Checkout({
           step={1}
           value={received}
           disabled={busy || !!attempt}
-          placeholder="0 para dejar todo a crédito"
+          placeholder={
+            client?.creditEnabled
+              ? "0 para dejar todo a crédito"
+              : "Ingresa el efectivo recibido"
+          }
           onChange={(e) => update({ ...current, received: e.target.value })}
         />
       </label>
-      {client && (
-        <p>
-          Crédito:{" "}
-          <strong>
-            {client.creditEnabled ? "Habilitado" : "No habilitado"}
-          </strong>
-        </p>
-      )}
-      {newCredit > 0 &&
-        received !== "" &&
-        !clients.some((c) => c.active && c.creditEnabled) && (
+      {client?.creditEnabled ? (
+        <>
           <p>
-            No hay cuentas con crédito habilitado. El administrador puede
-            activarlo en Ajustes → Clientes → Editar cliente.
+            Crédito: <strong>Habilitado</strong>
           </p>
-        )}
-      <div className="checkout-summary" aria-live="polite">
-        {client && (
-          <p>
-            Deuda actual: <strong>{money(balance)}</strong>
-          </p>
-        )}
-        <p>
-          Productos de esta canasta: <strong>{money(total)}</strong>
-        </p>
-        <p>
-          Pago de esta compra: <strong>{money(paidNow)}</strong>
-        </p>
-        <p>
-          Nuevo crédito: <strong>{money(newCredit)}</strong>
-        </p>
-        <p>
-          Abono a deuda anterior: <strong>{money(abono)}</strong>
-        </p>
-        <p>
-          Cambio: <strong>{money(change)}</strong>
-        </p>
-        {client && (
-          <p>
-            Saldo después de confirmar: <strong>{money(futureBalance)}</strong>
-          </p>
-        )}
-      </div>
-      {client && balance > 0 && (
-        <p>
-          El excedente se abona a la deuda anterior; después de saldarla, el
-          resto es cambio.
-        </p>
-      )}
-      {newCredit > 0 && (
-        <p>
-          Para anotar saldo pendiente selecciona una cuenta activa con crédito
-          habilitado. Confirma después de entregar los productos.
-        </p>
+          <div className="checkout-summary" aria-live="polite">
+            <p>
+              Deuda actual: <strong>{money(balance)}</strong>
+            </p>
+            <p>
+              Productos de esta canasta: <strong>{money(total)}</strong>
+            </p>
+            <p>
+              Pago de esta compra: <strong>{money(paidNow)}</strong>
+            </p>
+            <p>
+              Nuevo crédito: <strong>{money(newCredit)}</strong>
+            </p>
+            <p>
+              Abono a deuda anterior: <strong>{money(abono)}</strong>
+            </p>
+            <p>
+              Cambio: <strong>{money(change)}</strong>
+            </p>
+            <p>
+              Saldo después de confirmar:{" "}
+              <strong>{money(futureBalance)}</strong>
+            </p>
+          </div>
+          {balance > 0 && (
+            <p>
+              El excedente se abona a la deuda anterior; después de saldarla, el
+              resto es cambio.
+            </p>
+          )}
+        </>
+      ) : (
+        <div
+          className={
+            "cash-feedback " +
+            (received.trim() === ""
+              ? "neutral"
+              : newCredit > 0
+                ? "shortage"
+                : "change")
+          }
+          role="status"
+        >
+          {received.trim() === "" ? (
+            <p>Ingresa el efectivo recibido para calcular el cambio.</p>
+          ) : newCredit > 0 ? (
+            <p>
+              Faltan: <strong>{money(newCredit)}</strong>
+            </p>
+          ) : (
+            <p>
+              Cambio: <strong>{money(change)}</strong>
+            </p>
+          )}
+        </div>
       )}
       <p role="alert">{error}</p>
       {attempt ? (
@@ -280,7 +289,7 @@ export function Checkout({
         >
           {busy
             ? "Registrando…"
-            : newCredit > 0
+            : newCredit > 0 && client?.creditEnabled
               ? "Anotar a crédito " + money(newCredit)
               : abono > 0
                 ? "Cobrar y abonar " + money(abono)

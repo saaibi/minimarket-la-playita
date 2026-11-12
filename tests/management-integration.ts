@@ -889,6 +889,31 @@ test(
         (await req("/credit/me", registeredBuyer)).data.balanceCop,
         0,
       );
+      const newDebt = await autoPay(0);
+      assert.equal(newDebt.reply.status, 201);
+      await req(permissionPath, admin, "POST", { creditEnabled: false });
+      const noCreditCash = await autoPay(2000);
+      assert.equal(noCreditCash.reply.status, 201);
+      assert.equal(noCreditCash.reply.data.cashChange, 1000);
+      assert.equal(
+        (await req("/credit/me", registeredBuyer)).data.balanceCop,
+        1000,
+      );
+      assert.equal(
+        (
+          await req("/credit/checkout", seller, "POST", {
+            mode: "auto",
+            clientId: creditCustomer.id,
+            lines: autoLines,
+            cashReceived: 1000,
+            expectedTotalCop: 1000,
+            expectedBalanceCop: 1000,
+            expectedCreditEnabled: true,
+          })
+        ).data.code,
+        "CREDIT_PERMISSION_CHANGED",
+      );
+      await req(permissionPath, admin, "POST", { creditEnabled: true });
       const beforeRejected = (await req("/inventory", admin)).data;
       assert.equal(
         (
@@ -898,7 +923,7 @@ test(
             lines: autoLines,
             cashReceived: 0,
             expectedTotalCop: 1000,
-            expectedBalanceCop: 1,
+            expectedBalanceCop: 1001,
           })
         ).data.code,
         "CREDIT_BALANCE_CHANGED",
@@ -911,7 +936,7 @@ test(
             lines: autoLines,
             cashReceived: 0,
             expectedTotalCop: 999,
-            expectedBalanceCop: 0,
+            expectedBalanceCop: 1000,
           })
         ).data.code,
         "TOTAL_CHANGED",
