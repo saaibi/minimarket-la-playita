@@ -154,8 +154,10 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
         assert.ok(view.getByRole("button", { name: "+ Agregar" })),
       );
       fireEvent.click(view.getByRole("button", { name: "+ Agregar" }));
-      if (role !== "buyer")
+      if (role !== "buyer") {
         assert.equal(view.queryByLabelText("Ver canasta"), null);
+        assert.equal(view.queryByRole("button", { name: /Canasta ·/ }), null);
+      }
       fireEvent.click(
         view.getAllByRole("button", { name: "Ver canasta" }).at(-1)!,
       );

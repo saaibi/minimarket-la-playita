@@ -785,7 +785,7 @@ export function Shop() {
                 </h1>
                 <p>
                   {view === "pos"
-                    ? "Agrega productos y confirma el efectivo recibido para registrar una venta."
+                    ? "Agrega productos y registra pagos, créditos o abonos desde la canasta."
                     : "Elige tus productos y recógelos en La Playita."}
                 </p>
                 <small>Precios en COP</small>
@@ -816,9 +816,11 @@ export function Shop() {
                     <option key={c}>{c}</option>
                   ))}
                 </Select>
-                <Button onClick={() => setCartOpen(true)}>
-                  Canasta · {money(total)}
-                </Button>
+                {view !== "pos" && (
+                  <Button onClick={() => setCartOpen(true)}>
+                    Canasta · {money(total)}
+                  </Button>
+                )}
               </div>
               <div className="cards">
                 {products
@@ -1112,7 +1114,7 @@ export function Shop() {
           </div>
           <p>
             {staff && view === "pos"
-              ? "Confirma únicamente después de recibir el efectivo. La venta requiere conexión."
+              ? "Revisa el cliente y el tipo de cobro antes de confirmar. Requiere conexión."
               : payment === "nequi"
                 ? "No se procesa ni confirma un pago Nequi desde la aplicación."
                 : "La tienda confirma el pago en efectivo al recoger."}
