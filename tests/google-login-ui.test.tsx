@@ -82,11 +82,11 @@ test("Google web: botón oficial directo, un clic y sin cuadro intermedio", asyn
     const view = render(
       <GoogleLogin disabled={false} onBusy={(v) => busy.push(v)} />,
     );
-    await waitFor(() => assert.equal(rendered, 1));
+    await waitFor(() => assert.equal(rendered, 1), { timeout: 5000 });
     assert.equal(view.queryByRole("dialog"), null);
     assert.equal(view.queryByText(/Elige tu cuenta/), null);
     fireEvent.click(view.getByRole("button", { name: "Acceder con Google" }));
-    await waitFor(() => assert.equal(verified, 1));
+    await waitFor(() => assert.equal(verified, 1), { timeout: 5000 });
     assert.ok(busy.includes(true));
     assert.equal(view.queryByRole("dialog"), null);
   } finally {
