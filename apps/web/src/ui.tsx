@@ -112,6 +112,7 @@ export function modulesFor(role: string) {
     ? [
         ["catalog", "Catálogo"],
         ["orders", "Mis pedidos"],
+        ["profile", "Mi cuenta"],
       ]
     : navItems.filter(([id]) => role === "admin" || id !== "settings");
 }

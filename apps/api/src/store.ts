@@ -46,7 +46,7 @@ export class Store {
   }
   async list(actor: Actor) {
     const { rows } = await this.pool.query(
-      `SELECT id FROM orders WHERE NOT sale_removed ${actor.role === "buyer" ? "AND owner_id=$1" : ""} ORDER BY created_at DESC LIMIT 100`,
+      `SELECT id FROM orders WHERE NOT sale_removed ${actor.role === "buyer" ? "AND (owner_id=$1 OR id IN (SELECT order_id FROM credit_sales WHERE client_id=$1))" : ""} ORDER BY created_at DESC LIMIT 100`,
       actor.role === "buyer" ? [actor.id] : [],
     );
     return Promise.all(rows.map((o) => this.get(actor, o.id)));
@@ -58,13 +58,18 @@ export class Store {
         [id],
       )
     ).rows[0];
-    if (!row || (actor.role === "buyer" && row.ownerId !== actor.id))
-      return null;
+    if (!row) return null;
     const credit = (
       await db.query("SELECT client_id FROM credit_sales WHERE order_id=$1", [
         id,
       ])
     ).rows[0];
+    if (
+      actor.role === "buyer" &&
+      row.ownerId !== actor.id &&
+      credit?.client_id !== actor.id
+    )
+      return null;
     if (credit) row.creditClientId = credit.client_id;
     row.lines = (
       await db.query(
@@ -443,7 +448,7 @@ export class Store {
   async creditDetail(actor: Actor, id: string) {
     const client = (
       await this.pool.query(
-        "SELECT id,COALESCE(email,phone) AS name,'' AS contact FROM app_users WHERE id=$1 AND NOT is_guest",
+        "SELECT id,COALESCE(email,phone) AS name,'' AS contact,credit_enabled AS \"creditEnabled\" FROM app_users WHERE id=$1 AND NOT is_guest",
         [id],
       )
     ).rows[0];

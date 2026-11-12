@@ -450,3 +450,111 @@ export function Credits({
     </section>
   );
 }
+
+export function BuyerProfile({
+  owner,
+  guest,
+}: {
+  owner: string;
+  guest: boolean;
+}) {
+  const [profile, setProfile] = useState<any>(null),
+    [orders, setOrders] = useState<any[]>([]),
+    [error, setError] = useState("");
+  async function load() {
+    try {
+      setError("");
+      const [p, list] = await Promise.all([
+        get(owner, "/credit/me"),
+        get(owner, "/orders"),
+      ]);
+      setProfile(p);
+      setOrders(list);
+    } catch {
+      setError("No se pudo consultar tu cuenta. Vuelve a actualizar.");
+    }
+  }
+  useEffect(() => {
+    if (!guest) void load();
+  }, [owner, guest]);
+  if (guest)
+    return (
+      <section className="panel">
+        <h1>Mi cuenta</h1>
+        <p>
+          Entra con tu cuenta de Google para consultar tu crédito, saldo y
+          pedidos registrados a tu nombre.
+        </p>
+      </section>
+    );
+  function orderDetails(o: any, credit?: any) {
+    return (
+      <details className="panel" key={o.id}>
+        <summary>
+          {new Date(o.createdAt).toLocaleString("es-CO", {
+            timeZone: "America/Bogota",
+          })}{" "}
+          · {money(o.totalCop)} · {credit ? "A crédito" : "Pedido"}
+        </summary>
+        <ul className="customer-list">
+          {o.lines.map((l: any, i: number) => (
+            <li key={i}>
+              {l.productName} · {l.quantity}{" "}
+              {l.kind === "weight" ? "g" : l.presentationName || "unidades"} ·{" "}
+              {money(l.totalCop)}
+            </li>
+          ))}
+        </ul>
+        {credit && (
+          <>
+            <p>
+              Abonado: {money(credit.paidCop)} · Debe:{" "}
+              <strong>{money(credit.balanceCop)}</strong>
+            </p>
+            {credit.payments.map((p: any) => (
+              <small key={p.id}>
+                Abono {money(p.amountCop)} ·{" "}
+                {new Date(p.createdAt).toLocaleString("es-CO", {
+                  timeZone: "America/Bogota",
+                })}
+              </small>
+            ))}
+          </>
+        )}
+      </details>
+    );
+  }
+  return (
+    <section>
+      <h1>Mi cuenta</h1>
+      <Button type="button" onClick={() => void load()}>
+        Actualizar mi información
+      </Button>
+      <p role="alert">{error}</p>
+      {profile && (
+        <>
+          <h2>{profile.name}</h2>
+          <p>
+            Crédito:{" "}
+            <strong>
+              {profile.creditEnabled ? "Habilitado" : "No habilitado"}
+            </strong>
+          </p>
+          <p className="price">Debes: {money(profile.balanceCop)}</p>
+          <h2>Compras a crédito y abonos</h2>
+          {profile.orders.length ? (
+            profile.orders.map((o: any) => orderDetails(o, o))
+          ) : (
+            <p>No tienes compras a crédito registradas.</p>
+          )}
+          <h2>Otros pedidos</h2>
+          {orders.filter((o) => !o.creditClientId).length ? (
+            orders.filter((o) => !o.creditClientId).map((o) => orderDetails(o))
+          ) : (
+            <p>No hay otros pedidos registrados.</p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}

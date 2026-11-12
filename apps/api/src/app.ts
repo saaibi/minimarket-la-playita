@@ -162,6 +162,14 @@ class ApiController {
     res.setHeader("Idempotency-Replayed", String(!!result.replayed));
     return res.status(result.status).json(result.body);
   }
+  @Get("credit/me") async myCredit(@Req() req: Request, @Res() res: any) {
+    if (req.actor.role !== "buyer")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    const profile = await this.store.creditDetail(req.actor, req.actor.id);
+    return res
+      .status(profile ? 200 : 404)
+      .json(profile || { code: "ACCOUNT_REQUIRED" });
+  }
   @Get("credit/clients") creditClients(@Req() req: Request, @Res() res: any) {
     if (req.actor.role === "buyer")
       return res.status(403).json({ code: "FORBIDDEN" });
@@ -221,12 +229,10 @@ class ApiController {
         )
       ).rows[0];
       if (!client)
-        return res
-          .status(409)
-          .json({
-            code: "CLIENT_UNAVAILABLE",
-            message: "Selecciona una cuenta registrada y activa",
-          });
+        return res.status(409).json({
+          code: "CLIENT_UNAVAILABLE",
+          message: "Selecciona una cuenta registrada y activa",
+        });
     }
     const r = await this.store.create(
       req.actor,

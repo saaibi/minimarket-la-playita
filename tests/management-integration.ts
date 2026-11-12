@@ -18,7 +18,21 @@ test(
     let server: Awaited<ReturnType<typeof createApp>> | undefined;
     try {
       await migrate(url.toString());
-      server = await createApp({ databaseUrl: url.toString() });
+      server = await createApp({
+        databaseUrl: url.toString(),
+        googleVerifier: {
+          clientId: "test.apps.googleusercontent.com",
+          verify: async (token: string) => ({
+            subject: token.startsWith("second")
+              ? "test-second-buyer"
+              : "test-credit-buyer",
+            email: token.startsWith("second")
+              ? "second-buyer@example.invalid"
+              : "credit-customer@example.invalid",
+            emailAuthoritative: true,
+          }),
+        },
+      });
       const pass = "only-integration-" + crypto.randomUUID();
       await bootstrapAdmin(server.pool, "owner@example.invalid", pass);
       await server.app.listen(0, "127.0.0.1");
@@ -543,6 +557,57 @@ test(
       assert.equal(credit.data.paymentStatus, "pending");
       assert.equal(credit.data.totalCop, 2000);
       assert.equal(credit.data.creditClientId, creditCustomer.id);
+      const challenge = (await req("/auth/google/challenge", "", "POST", {}))
+        .data;
+      const registeredBuyer = (
+        await req("/auth/google/verify", "", "POST", {
+          challengeId: challenge.challengeId,
+          proof: challenge.proof,
+          credential: "test-credential".repeat(10),
+        })
+      ).data.accessToken;
+      assert.ok(registeredBuyer);
+      const ownProfile = (await req("/credit/me", registeredBuyer)).data;
+      assert.equal(ownProfile.creditEnabled, true);
+      assert.equal(ownProfile.balanceCop, 2000);
+      assert.equal(ownProfile.orders[0].lines[0].quantity, 2);
+      assert.equal(
+        (await req("/orders/" + credit.data.id, registeredBuyer)).status,
+        200,
+      );
+      assert.ok(
+        (await req("/orders", registeredBuyer)).data.some(
+          (o: any) => o.id === credit.data.id,
+        ),
+      );
+      assert.equal((await req("/orders/" + credit.data.id, buyer)).status, 404);
+      assert.equal((await req("/credit/me", buyer)).status, 404);
+      const otherChallenge = (
+        await req("/auth/google/challenge", "", "POST", {})
+      ).data;
+      const otherBuyer = (
+        await req("/auth/google/verify", "", "POST", {
+          challengeId: otherChallenge.challengeId,
+          proof: otherChallenge.proof,
+          credential: "second-credential".repeat(10),
+        })
+      ).data.accessToken;
+      assert.equal(
+        (await req("/orders/" + credit.data.id, otherBuyer)).status,
+        404,
+      );
+      assert.equal(
+        (await req("/credit/me?clientId=" + creditCustomer.id, otherBuyer)).data
+          .balanceCop,
+        0,
+      );
+
+      assert.equal(
+        (await req("/credit/clients/" + creditCustomer.id, registeredBuyer))
+          .status,
+        403,
+      );
+
       assert.equal(
         (await req("/credit/sales", seller, "POST", creditDraft, ck)).data.id,
         credit.data.id,

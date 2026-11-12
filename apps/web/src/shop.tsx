@@ -1,4 +1,4 @@
-import { Credits, Checkout } from "./credit.js";
+import { Credits, Checkout, BuyerProfile } from "./credit.js";
 import Chip from "@mui/material/Chip";
 import Card from "@mui/material/Card";
 import { Button, Input, Select } from "./material.js";
@@ -858,6 +858,12 @@ export function Shop() {
                 </p>
               )}
             </>
+          )}
+          {view === "profile" && !staff && (
+            <BuyerProfile
+              owner={session.actor.id}
+              guest={!!session.actor.guest}
+            />
           )}
           {view === "credit" && staff && (
             <Credits
