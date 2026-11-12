@@ -46,7 +46,7 @@ export class Store {
   }
   async list(actor: Actor) {
     const { rows } = await this.pool.query(
-      `SELECT id FROM orders WHERE NOT sale_removed ${actor.role === "buyer" ? "AND (owner_id=$1 OR id IN (SELECT order_id FROM credit_sales WHERE client_id=$1))" : ""} ORDER BY created_at DESC LIMIT 100`,
+      `SELECT id FROM orders WHERE NOT sale_removed ${actor.role === "buyer" ? "AND (owner_id=$1 OR id IN (SELECT order_id FROM credit_sales WHERE client_id=$1::uuid))" : ""} ORDER BY created_at DESC LIMIT 100`,
       actor.role === "buyer" ? [actor.id] : [],
     );
     return Promise.all(rows.map((o) => this.get(actor, o.id)));
