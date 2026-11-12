@@ -1275,3 +1275,65 @@ label .MuiInputBase-root {
   color: var(--muted);
   background: #f4f6f1;
 }
+
+/* Long account names must not compete with the close action. */
+.dialog-top h2 {
+  flex: 1 1 0;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+.dialog-top > button {
+  align-self: flex-start;
+}
+.account-picker {
+  min-width: 0;
+  margin-bottom: 10px;
+}
+.account-picker > label {
+  display: block;
+  margin-bottom: 6px;
+}
+.account-option.MuiAutocomplete-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 10px 14px;
+  min-width: 0;
+}
+.account-option > span {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.account-option > small {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.account-picker .MuiInputBase-input {
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+.notification.MuiButton-root {
+  margin: 10px 0 0;
+  padding: 12px;
+  gap: 6px;
+  line-height: 1.4;
+}
+.notification.MuiButton-root small {
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+.notification.MuiButton-root span {
+  margin-top: 2px;
+}
+@media (max-width: 600px) {
+  .dialog-top {
+    gap: 10px;
+  }
+  .dialog-top > button {
+    font-size: 0.8125rem;
+    padding: 6px 10px;
+  }
+}

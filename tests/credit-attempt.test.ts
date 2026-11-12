@@ -7,6 +7,7 @@ test("Crédito: una respuesta perdida conserva solicitud y clave por usuario; ot
     window: dom.window,
     document: dom.window.document,
     HTMLElement: dom.window.HTMLElement,
+    Element: dom.window.Element,
     localStorage: dom.window.localStorage,
   });
   const { auth } = await import("../apps/web/src/session.js");
@@ -64,6 +65,7 @@ test("Canasta: pago más abono muestra reparto y confirma una sola solicitud", a
     window: dom.window,
     document: dom.window.document,
     HTMLElement: dom.window.HTMLElement,
+    Element: dom.window.Element,
     localStorage: dom.window.localStorage,
     IS_REACT_ACT_ENVIRONMENT: true,
   });
@@ -109,12 +111,19 @@ test("Canasta: pago más abono muestra reparto y confirma una sola solicitud", a
       }),
     );
     await waitFor(() =>
-      assert.ok(view.getByRole("option", { name: "cliente@example.invalid" })),
+      assert.equal(
+        (view.getByRole("combobox") as HTMLInputElement).disabled,
+        false,
+      ),
     );
 
-    fireEvent.change(view.getByRole("combobox"), {
-      target: { value: clientId },
-    });
+    fireEvent.mouseDown(view.getByRole("combobox"));
+    await waitFor(() =>
+      assert.ok(view.getByRole("option", { name: /cliente@example.invalid/ })),
+    );
+    fireEvent.click(
+      view.getByRole("option", { name: /cliente@example.invalid/ }),
+    );
     fireEvent.change(view.getByLabelText("Efectivo recibido (COP)"), {
       target: { value: "10000" },
     });
@@ -145,6 +154,7 @@ test("Créditos: solo habilitados por defecto, búsqueda y deudas deshabilitadas
     window: dom.window,
     document: dom.window.document,
     HTMLElement: dom.window.HTMLElement,
+    Element: dom.window.Element,
     localStorage: dom.window.localStorage,
     IS_REACT_ACT_ENVIRONMENT: true,
   });
@@ -228,6 +238,7 @@ test("Contado: general y cuenta sin crédito muestran faltante o cambio sin abon
     window: dom.window,
     document: dom.window.document,
     HTMLElement: dom.window.HTMLElement,
+    Element: dom.window.Element,
     localStorage: dom.window.localStorage,
     IS_REACT_ACT_ENVIRONMENT: true,
   });
@@ -270,7 +281,10 @@ test("Contado: general y cuenta sin crédito muestran faltante o cambio sin abon
       }),
     );
     await waitFor(() =>
-      assert.ok(view.getByRole("option", { name: "contado@example.invalid" })),
+      assert.equal(
+        (view.getByRole("combobox") as HTMLInputElement).disabled,
+        false,
+      ),
     );
     fireEvent.change(view.getByLabelText("Efectivo recibido (COP)"), {
       target: { value: "5000" },
@@ -286,9 +300,13 @@ test("Contado: general y cuenta sin crédito muestran faltante o cambio sin abon
       ).disabled,
       true,
     );
-    fireEvent.change(view.getByRole("combobox"), {
-      target: { value: clientId },
-    });
+    fireEvent.mouseDown(view.getByRole("combobox"));
+    await waitFor(() =>
+      assert.ok(view.getByRole("option", { name: /contado@example.invalid/ })),
+    );
+    fireEvent.click(
+      view.getByRole("option", { name: /contado@example.invalid/ }),
+    );
     fireEvent.change(view.getByLabelText("Efectivo recibido (COP)"), {
       target: { value: "10000" },
     });

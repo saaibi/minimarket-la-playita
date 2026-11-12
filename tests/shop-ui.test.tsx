@@ -107,7 +107,7 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
       const nav = view.getByRole("navigation", { name: "Módulos" });
       assert.equal(
         nav.querySelectorAll("button").length,
-        role === "admin" ? 6 : role === "seller" ? 5 : 2,
+        role === "buyer" ? 3 : 6,
       );
       if (role === "admin") {
         await waitFor(() =>
@@ -144,10 +144,28 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
         fireEvent.click(view.getByRole("button", { name: "Caja" }));
       }
       if (role === "seller") {
-        assert.equal(view.queryByRole("button", { name: "Ajustes" }), null);
+        assert.ok(view.getByRole("button", { name: "Ajustes" }));
         assert.equal(
           view.queryByRole("button", { name: /Nuevo producto/ }),
           null,
+        );
+      }
+      if (role !== "admin") {
+        fireEvent.click(view.getByRole("button", { name: "Ajustes" }));
+        assert.ok(view.getByRole("slider", { name: "Tamaño del texto" }));
+        assert.equal(
+          view.queryByRole("heading", { name: "Cuentas y roles" }),
+          null,
+        );
+        assert.equal(
+          view.queryByRole("heading", { name: "Horario · Bogotá" }),
+          null,
+        );
+        assert.equal(view.queryByRole("heading", { name: "Clientes" }), null);
+        fireEvent.click(
+          view.getByRole("button", {
+            name: role === "buyer" ? "Catálogo" : "Caja",
+          }),
         );
       }
       await waitFor(() =>

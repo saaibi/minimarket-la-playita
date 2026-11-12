@@ -1,3 +1,5 @@
+import Autocomplete from "@mui/material/Autocomplete";
+import TextField from "@mui/material/TextField";
 import React, { useEffect, useState } from "react";
 import { openNativeOutbox, type Outbox } from "@playita/mobile";
 import { native, auth } from "./session.js";
@@ -183,24 +185,47 @@ export function Checkout({
   }
   return (
     <section className="checkout">
-      <label>
-        Cliente (opcional)
-        <Select
-          value={clientId}
+      <div className="account-picker">
+        <label htmlFor="checkout-client">Cliente (opcional)</label>
+        <Autocomplete
+          id="checkout-client"
+          options={[
+            { id: "", name: "Cliente general" },
+            ...clients.filter((c) => c.active),
+          ]}
+          value={client || { id: "", name: "Cliente general" }}
+          getOptionLabel={(option) => option.name}
+          isOptionEqualToValue={(option, value) => option.id === value.id}
           disabled={busy || !!attempt || loading}
-          onChange={(e) => update({ ...current, clientId: e.target.value })}
-        >
-          <option value="">Cliente general</option>
-          {clients
-            .filter((c) => c.active)
-            .map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {c.role ? " · " + roles[c.role as keyof typeof roles] : ""}
-              </option>
-            ))}
-        </Select>
-      </label>
+          onChange={(_event, selected) =>
+            update({ ...current, clientId: selected?.id || "" })
+          }
+          noOptionsText="No se encontraron cuentas"
+          openText="Buscar cliente"
+          closeText="Cerrar opciones"
+          clearText="Cliente general"
+          size="small"
+          fullWidth
+          renderInput={(params) => (
+            <TextField {...params} placeholder="Buscar por correo" />
+          )}
+          renderOption={(props, option) => {
+            const { key, ...rest } = props;
+            return (
+              <li
+                key={key}
+                {...rest}
+                className={`${props.className || ""} account-option`}
+              >
+                <span>{option.name}</span>
+                {option.role && (
+                  <small>{roles[option.role as keyof typeof roles]}</small>
+                )}
+              </li>
+            );
+          }}
+        />
+      </div>
       <Button
         type="button"
         disabled={busy || loading || !!attempt}

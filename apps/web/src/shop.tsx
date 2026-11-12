@@ -1,7 +1,7 @@
 import { Credits, Checkout, BuyerProfile } from "./credit.js";
 import Chip from "@mui/material/Chip";
 import Card from "@mui/material/Card";
-import { Button, Input, Select } from "./material.js";
+import { Button, Input, Select, TextSizeSettings } from "./material.js";
 import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import {
@@ -685,7 +685,9 @@ export function Shop() {
           {modulesFor(role)
             .filter(
               ([id]) =>
-                (id !== "settings" || session.mode === "authenticated") &&
+                (id !== "settings" ||
+                  !admin ||
+                  session.mode === "authenticated") &&
                 (id !== "profile" || ownCreditEnabled),
             )
             .map(([id, label]) => (
@@ -1024,6 +1026,14 @@ export function Shop() {
             <>
               <h1>Notificaciones</h1>
               {noticesBody()}
+            </>
+          )}
+          {view === "settings" && !admin && (
+            <>
+              <div className="heading">
+                <h1>Ajustes</h1>
+              </div>
+              <TextSizeSettings />
             </>
           )}
           {view === "settings" && admin && session.mode === "authenticated" && (

@@ -113,6 +113,7 @@ export function modulesFor(role: string) {
         ["catalog", "Catálogo"],
         ["orders", "Mis pedidos"],
         ["profile", "Mi cuenta"],
+        ["settings", "Ajustes"],
       ]
-    : navItems.filter(([id]) => role === "admin" || id !== "settings");
+    : navItems;
 }
