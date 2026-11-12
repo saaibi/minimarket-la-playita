@@ -1,0 +1,11 @@
+# Crédito de clientes
+
+Administrador y vendedor pueden anotar ventas y abonos. El deudor debe ser una cuenta creada y activa en app_users; se rechazan invitados y contactos manuales de clients. Las cuentas desactivadas conservan sus saldos consultables y pueden recibir abonos, pero no créditos nuevos. No se asignan roles ni se crean cuentas desde Caja.
+
+Canasta: Pago completo (cliente opcional), A crédito (cliente obligatorio) o Pago + abono. El excedente de efectivo tras cubrir la canasta abona la deuda anterior hasta saldarla; el resto es cambio. El servidor valida importe, saldo, stock y precios; guarda venta y abonos en la misma transacción. Si algo falla, no guarda ninguno. Abonos repartidos a pedidos más antiguos primero. No se cobran intereses ni se ejecutan pagos externos.
+
+Créditos muestra totales por cliente, cada pedido con productos/precios históricos y abonos por fecha. Abono individual con importe positivo y sin superar saldo. La fila de pedido se bloquea antes de calcular el saldo para evitar sobreabonos simultáneos. La venta a crédito descuenta stock una vez; los abonos no alteran inventario. Los créditos no pueden retirarse como registros de prueba.
+
+Migración aditiva 007_customer_credit.sql. Nuevas rutas y cuerpos en openapi.json. Cada escritura usa Idempotency-Key; el intento y su cuerpo se guardan localmente por usuario antes del envío. Una respuesta perdida conserva esa clave. Créditos permite reintentar operaciones pendientes; no se deben registrar ni recibir cobros otra vez. Un error de validación confirmado permite corregir; un resultado desconocido conserva el intento. Solo conexión activa, sin confirmación offline. No se guardan tokens de sesión en ese registro local.
+
+Pruebas PostgreSQL: permisos, cuentas registradas/activas frente a invitado/contacto, idempotencia de ventas y abonos, saldo, abonos concurrentes, stock inalterado por pagos, cobro combinado y rollback íntegro si cambia deuda. Pruebas DOM: selección del modo, reparto de efectivo en venta/abono/cambio y una solicitud; reintento con clave/cuerpo conservados y aislamiento por usuario.

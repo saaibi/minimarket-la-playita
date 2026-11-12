@@ -60,6 +60,12 @@ export class Store {
     ).rows[0];
     if (!row || (actor.role === "buyer" && row.ownerId !== actor.id))
       return null;
+    const credit = (
+      await db.query("SELECT client_id FROM credit_sales WHERE order_id=$1", [
+        id,
+      ])
+    ).rows[0];
+    if (credit) row.creditClientId = credit.client_id;
     row.lines = (
       await db.query(
         'SELECT product_id AS "productId",product_name AS "productName",kind,presentation_name AS "presentationName",units_per_package AS factor,quantity,base_quantity AS "baseQuantity",price_cop AS "priceCop",total_cop AS "totalCop" FROM order_lines WHERE order_id=$1 ORDER BY id',
@@ -156,6 +162,8 @@ export class Store {
     draft: OrderDraft,
     sale = false,
     cashReceived?: number,
+    creditClientId?: string,
+    settlement?: { clientId: string; amountCop: number },
   ) {
     return this.once(
       actor,
@@ -163,7 +171,7 @@ export class Store {
       {
         operation: sale ? "create-sale" : "create-order",
         draft,
-        ...(sale ? { cashReceived } : {}),
+        ...(sale ? { cashReceived, creditClientId, settlement } : {}),
       },
       async (db, events) => {
         if (sale && (actor.role === "buyer" || draft.paymentMethod !== "cash"))
@@ -171,6 +179,22 @@ export class Store {
             "POS_NOT_ALLOWED",
             "Venta directa solo personal y efectivo confirmado",
           );
+        let creditClient;
+        if (creditClientId || settlement) {
+          if (!sale || actor.role === "buyer")
+            throw new Conflict("FORBIDDEN", "Solo personal");
+          creditClient = (
+            await db.query(
+              "SELECT *,COALESCE(email,phone) AS name FROM app_users WHERE id=$1 AND active AND NOT is_guest FOR UPDATE",
+              [creditClientId || settlement?.clientId],
+            )
+          ).rows[0];
+          if (!creditClient)
+            throw new Conflict(
+              "CLIENT_UNAVAILABLE",
+              "Selecciona un cliente registrado",
+            );
+        }
         const ids = [...new Set(draft.lines.map((l) => l.productId))].sort(),
           products = (
             await db.query(
@@ -243,7 +267,12 @@ export class Store {
               { productId: id, needed, available: p.stock - p.reserved },
             );
         }
-        if (sale && (cashReceived === undefined || cashReceived < total))
+        if (
+          sale &&
+          !creditClientId &&
+          (cashReceived === undefined ||
+            cashReceived < total + (settlement?.amountCop || 0))
+        )
           throw new Conflict(
             "INSUFFICIENT_CASH",
             "El efectivo recibido no cubre el total",
@@ -256,19 +285,41 @@ export class Store {
             actor.id,
             sale ? "delivered" : "confirmed",
             draft.paymentMethod,
-            sale
+            sale && !creditClientId
               ? "paid"
               : draft.paymentMethod === "nequi"
                 ? "not_integrated"
                 : "pending",
-            draft.client?.name || "Cliente general",
+            creditClient?.name || draft.client?.name || "Cliente general",
             draft.client?.reference || "",
             total,
             sale ? "pos" : "pickup",
-            sale ? cashReceived : null,
-            sale ? cashReceived! - total : null,
+            sale && !creditClientId ? cashReceived : null,
+            sale && !creditClientId
+              ? cashReceived! - total - (settlement?.amountCop || 0)
+              : null,
           ],
         );
+        if (creditClientId) {
+          if (total <= 0)
+            throw new Conflict(
+              "INVALID_CREDIT_TOTAL",
+              "El crédito debe ser mayor que cero",
+            );
+          await db.query(
+            "INSERT INTO credit_sales(order_id,client_id) VALUES($1,$2)",
+            [id, creditClientId],
+          );
+          await this.audit(
+            db,
+            actor,
+            "credit.sale",
+            id,
+            null,
+            { clientId: creditClientId, totalCop: total },
+            "Venta a crédito",
+          );
+        }
         for (const { p, v, l, base, linePrice, price } of lines)
           await db.query(
             "INSERT INTO order_lines(order_id,product_id,product_name,kind,presentation_id,presentation_name,units_per_package,quantity,base_quantity,price_cop,total_cop) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
@@ -301,7 +352,57 @@ export class Store {
               productId,
               products.find((p) => p.id === productId),
               { deducted: needed, orderId: id },
-              "Venta POS en efectivo",
+              creditClientId ? "Venta POS a crédito" : "Venta POS en efectivo",
+            );
+        }
+        if (settlement) {
+          const debts = (
+            await db.query(
+              `SELECT o.id,o.total_cop FROM orders o JOIN credit_sales s ON s.order_id=o.id WHERE s.client_id=$1 AND NOT o.sale_removed ORDER BY o.created_at,o.id FOR UPDATE OF o`,
+              [settlement.clientId],
+            )
+          ).rows;
+          let remaining = settlement.amountCop;
+          for (const debt of debts) {
+            const paid = Number(
+              (
+                await db.query(
+                  "SELECT COALESCE(SUM(amount_cop),0) AS paid FROM credit_payments WHERE order_id=$1",
+                  [debt.id],
+                )
+              ).rows[0].paid,
+            );
+            const amount = Math.min(remaining, debt.total_cop - paid);
+            if (amount > 0) {
+              await db.query(
+                "INSERT INTO credit_payments(id,order_id,amount_cop,actor_id) VALUES($1,$2,$3,$4)",
+                [randomUUID(), debt.id, amount, actor.id],
+              );
+              if (amount === debt.total_cop - paid)
+                await db.query(
+                  "UPDATE orders SET payment_status='paid' WHERE id=$1",
+                  [debt.id],
+                );
+              await this.audit(
+                db,
+                actor,
+                "credit.payment",
+                debt.id,
+                { balanceCop: debt.total_cop - paid },
+                {
+                  amountCop: amount,
+                  balanceCop: debt.total_cop - paid - amount,
+                  checkoutOrderId: id,
+                },
+                "Abono recibido junto con venta en caja",
+              );
+              remaining -= amount;
+            }
+          }
+          if (remaining > 0)
+            throw new Conflict(
+              "CREDIT_BALANCE_CHANGED",
+              "El saldo cambió. Revisa el abono antes de confirmar",
             );
         }
         await this.event(
@@ -317,6 +418,116 @@ export class Store {
           productIds: ids,
         });
         return (await this.get(actor, id, db))!;
+      },
+    );
+  }
+  async creditClients() {
+    return (
+      await this.pool
+        .query(`SELECT c.id,COALESCE(c.email,c.phone) AS name,'' AS contact,c.active,
+      COALESCE((SELECT SUM(o.total_cop) FROM credit_sales s JOIN orders o ON o.id=s.order_id WHERE s.client_id=c.id),0)::bigint AS "chargedCop",
+      COALESCE((SELECT SUM(p.amount_cop) FROM credit_payments p JOIN credit_sales s ON s.order_id=p.order_id WHERE s.client_id=c.id),0)::bigint AS "paidCop"
+      FROM app_users c WHERE NOT c.is_guest ORDER BY c.created_at`)
+    ).rows.map((c) => ({
+      ...c,
+      chargedCop: Number(c.chargedCop),
+      paidCop: Number(c.paidCop),
+      balanceCop: Number(c.chargedCop) - Number(c.paidCop),
+    }));
+  }
+  async creditDetail(actor: Actor, id: string) {
+    const client = (
+      await this.pool.query(
+        "SELECT id,COALESCE(email,phone) AS name,'' AS contact FROM app_users WHERE id=$1 AND NOT is_guest",
+        [id],
+      )
+    ).rows[0];
+    if (!client) return null;
+    const sales = (
+      await this.pool.query(
+        "SELECT order_id FROM credit_sales WHERE client_id=$1 ORDER BY order_id",
+        [id],
+      )
+    ).rows;
+    const orders = [];
+    for (const sale of sales) {
+      const order = (await this.get(actor, sale.order_id))!;
+      const payments = (
+        await this.pool.query(
+          'SELECT id,amount_cop AS "amountCop",created_at AS "createdAt" FROM credit_payments WHERE order_id=$1 ORDER BY created_at',
+          [sale.order_id],
+        )
+      ).rows;
+      const paidCop = payments.reduce((n, p) => n + p.amountCop, 0);
+      orders.push({
+        ...order,
+        payments,
+        paidCop,
+        balanceCop: order.totalCop - paidCop,
+      });
+    }
+    return {
+      ...client,
+      orders,
+      balanceCop: orders.reduce((n, o) => n + o.balanceCop, 0),
+    };
+  }
+  creditPayment(actor: Actor, key: string, id: string, amountCop: number) {
+    return this.once(
+      actor,
+      key,
+      { operation: "credit-payment", id, amountCop },
+      async (db, events) => {
+        if (actor.role === "buyer")
+          throw new Conflict("FORBIDDEN", "Solo personal");
+        const sale = (
+          await db.query(
+            "SELECT o.* FROM orders o JOIN credit_sales s ON s.order_id=o.id WHERE o.id=$1 FOR UPDATE OF o",
+            [id],
+          )
+        ).rows[0];
+        if (!sale || sale.sale_removed)
+          throw new Conflict("CREDIT_UNAVAILABLE", "Crédito no disponible");
+        const paid = Number(
+          (
+            await db.query(
+              "SELECT COALESCE(SUM(amount_cop),0) AS paid FROM credit_payments WHERE order_id=$1",
+              [id],
+            )
+          ).rows[0].paid,
+        );
+        const balance = sale.total_cop - paid;
+        if (amountCop > balance)
+          throw new Conflict(
+            "EXCESS_PAYMENT",
+            "El abono supera el saldo pendiente",
+          );
+        const paymentId = randomUUID();
+        await db.query(
+          "INSERT INTO credit_payments(id,order_id,amount_cop,actor_id) VALUES($1,$2,$3,$4)",
+          [paymentId, id, amountCop, actor.id],
+        );
+        if (amountCop === balance)
+          await db.query(
+            "UPDATE orders SET payment_status='paid' WHERE id=$1",
+            [id],
+          );
+        await this.audit(
+          db,
+          actor,
+          "credit.payment",
+          id,
+          { balanceCop: balance },
+          { amountCop, balanceCop: balance - amountCop },
+          "Abono en efectivo a crédito",
+        );
+        await this.event(db, events, "credit.updated", null, { orderId: id });
+        return {
+          id: paymentId,
+          orderId: id,
+          amountCop,
+          balanceCop: balance - amountCop,
+        };
       },
     );
   }
@@ -346,6 +557,14 @@ export class Store {
           throw new Conflict(
             "SALE_UNAVAILABLE",
             "Solo se puede retirar una venta de efectivo finalizada",
+          );
+        if (
+          (await db.query("SELECT 1 FROM credit_sales WHERE order_id=$1", [id]))
+            .rowCount
+        )
+          throw new Conflict(
+            "CREDIT_SALE",
+            "Los créditos conservan su historial de deuda y abonos",
           );
         if (sale.sale_removed === removed)
           throw new Conflict(

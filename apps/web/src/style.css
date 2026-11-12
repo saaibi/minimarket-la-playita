@@ -1154,3 +1154,92 @@ label .MuiInputBase-root {
   overflow-wrap: anywhere;
   min-width: 0;
 }
+
+.sticky-shop-top {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+.sticky-shop-top header {
+  position: relative;
+}
+.cart-dock {
+  background: var(--green);
+  color: white;
+  padding: 8px 20px;
+}
+.cart-dock .MuiButton-root {
+  color: white;
+  border-color: #ffffff80;
+  white-space: nowrap;
+}
+.product-card.MuiCard-root {
+  padding: 14px;
+}
+.product-card .product-art,
+.product-card .product-art.has-photo {
+  height: 120px;
+  margin-bottom: 8px;
+}
+.product-card h3 {
+  margin: 6px 0 2px;
+}
+.product-card .tag {
+  font-size: 0.65rem;
+  padding: 3px 7px;
+}
+.product-card .price {
+  margin: 8px 0;
+  font-size: 1.3rem;
+  line-height: 1.2;
+}
+.product-card .price small {
+  line-height: 1.3;
+}
+.product-card label {
+  margin: 4px 0 8px;
+  gap: 3px;
+}
+.product-card .buyline {
+  gap: 8px;
+}
+.product-card > [role="alert"]:empty {
+  display: none;
+}
+.MuiInputBase-root select.MuiNativeSelect-select {
+  height: auto;
+  min-height: 24px;
+  padding: 8px 32px 8px 10px;
+  line-height: 24px;
+  box-sizing: content-box;
+}
+.MuiInputBase-root {
+  min-width: 0;
+}
+
+.credit-module .panel {
+  overflow-wrap: anywhere;
+}
+
+.cards {
+  align-items: start;
+}
+
+.checkout-modes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.checkout-modes button[aria-pressed="true"] {
+  background: var(--green);
+  color: white;
+}
+.checkout-summary {
+  background: #edf2e8;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+.checkout-summary p {
+  margin: 4px 0;
+}

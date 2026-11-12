@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import MuiButton from "@mui/material/Button";
 import OutlinedInput from "@mui/material/OutlinedInput";
-import NativeSelect from "@mui/material/NativeSelect";
+import MuiSelect from "@mui/material/Select";
 import Checkbox from "@mui/material/Checkbox";
 import Slider from "@mui/material/Slider";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
@@ -201,23 +201,29 @@ export function Select({
     ...inputProps
   } = props;
   return (
-    <NativeSelect
+    <MuiSelect
+      native
+      size="small"
       fullWidth
       name={name}
       id={id}
       value={value}
       defaultValue={defaultValue}
-      onChange={onChange}
+      onChange={(event) =>
+        onChange?.(event as unknown as React.ChangeEvent<HTMLSelectElement>)
+      }
       disabled={disabled}
       required={required}
       className={className}
       style={style}
       input={<OutlinedInput slots={{ notchedOutline: PlainOutline }} />}
       inputRef={ref}
-      inputProps={inputProps}
+      inputProps={
+        inputProps as React.ComponentProps<typeof OutlinedInput>["inputProps"]
+      }
     >
       {children}
-    </NativeSelect>
+    </MuiSelect>
   );
 }
 export function Textarea({

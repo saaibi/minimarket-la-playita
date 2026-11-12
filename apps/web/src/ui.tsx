@@ -104,6 +104,7 @@ export const navItems = [
   ["pos", "Caja"],
   ["orders", "Pedidos"],
   ["history", "Ventas"],
+  ["credit", "Créditos"],
   ["settings", "Ajustes"],
 ] as const;
 export function modulesFor(role: string) {

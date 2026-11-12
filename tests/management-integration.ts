@@ -459,6 +459,204 @@ test(
           .reserved,
         0,
       );
+
+      // Credit sales deduct stock once and keep a per-customer immutable order snapshot.
+      const creditProduct = (
+        await req("/inventory", admin, "POST", {
+          ...input,
+          name: "Producto crédito",
+          initialStock: 10,
+        })
+      ).data;
+      const cp = (await req("/inventory", admin)).data.find(
+        (x: any) => x.id === creditProduct.id,
+      );
+      const creditCustomer = (
+        await req("/auth/users/assign-role", admin, "POST", {
+          email: "credit-customer@example.invalid",
+          role: "buyer",
+        })
+      ).data;
+      const creditDraft = {
+        clientId: creditCustomer.id,
+        lines: [{ productId: cp.id, quantity: 2, expectedPriceCop: 1000 }],
+      };
+      assert.equal(
+        (await req("/credit/sales", buyer, "POST", creditDraft)).status,
+        403,
+      );
+      assert.equal((await req("/credit/clients", buyer)).status, 403);
+      assert.equal(
+        (
+          await req("/credit/sales", seller, "POST", {
+            ...creditDraft,
+            clientId: customer.id,
+          })
+        ).status,
+        409,
+      );
+      const guestId = (await req("/auth/me", buyer)).data.actor.id;
+      assert.equal(
+        (
+          await req("/credit/sales", seller, "POST", {
+            ...creditDraft,
+            clientId: guestId,
+          })
+        ).status,
+        409,
+      );
+      const ck = crypto.randomUUID();
+      const credit = await req(
+        "/credit/sales",
+        seller,
+        "POST",
+        creditDraft,
+        ck,
+      );
+      assert.equal(credit.status, 201);
+      assert.equal(credit.data.paymentStatus, "pending");
+      assert.equal(credit.data.totalCop, 2000);
+      assert.equal(credit.data.creditClientId, creditCustomer.id);
+      assert.equal(
+        (await req("/credit/sales", seller, "POST", creditDraft, ck)).data.id,
+        credit.data.id,
+      );
+      const creditStock = (await req("/inventory", admin)).data.find(
+        (x: any) => x.id === cp.id,
+      );
+      assert.equal(creditStock.stock, 8);
+      assert.equal(creditStock.reserved, 0);
+      const payPath = "/credit/sales/" + credit.data.id + "/payments";
+      assert.equal(
+        (await req(payPath, buyer, "POST", { amountCop: 500 })).status,
+        403,
+      );
+      assert.equal(
+        (await req(payPath, seller, "POST", { amountCop: 0 })).status,
+        400,
+      );
+      assert.equal(
+        (await req(payPath, seller, "POST", { amountCop: 2001 })).status,
+        409,
+      );
+      const pk = crypto.randomUUID();
+      assert.equal(
+        (await req(payPath, seller, "POST", { amountCop: 500 }, pk)).data
+          .balanceCop,
+        1500,
+      );
+      assert.equal(
+        (await req(payPath, seller, "POST", { amountCop: 500 }, pk)).replayed,
+        "true",
+      );
+      const concurrent = await Promise.all([
+        req(payPath, seller, "POST", { amountCop: 1000 }),
+        req(payPath, admin, "POST", { amountCop: 1000 }),
+      ]);
+      assert.deepEqual(concurrent.map((x) => x.status).sort(), [201, 409]);
+      const detail = (await req("/credit/clients/" + creditCustomer.id, seller))
+        .data;
+      assert.equal(detail.balanceCop, 500);
+      assert.equal(detail.orders[0].lines[0].quantity, 2);
+      assert.equal(detail.orders[0].payments.length, 2);
+      assert.equal(
+        (await req(payPath, admin, "POST", { amountCop: 500 })).data.balanceCop,
+        0,
+      );
+      assert.equal(
+        (await req("/orders/" + credit.data.id, admin)).data.paymentStatus,
+        "paid",
+      );
+      assert.equal(
+        (
+          await req("/sales/" + credit.data.id + "/removal", admin, "POST", {
+            removed: true,
+            reason: "No borrar créditos",
+          })
+        ).data.code,
+        "CREDIT_SALE",
+      );
+      assert.equal(
+        (await req("/credit/clients", seller)).data.find(
+          (x: any) => x.id === creditCustomer.id,
+        ).balanceCop,
+        0,
+      );
+      await server.pool.query("UPDATE app_users SET active=false WHERE id=$1", [
+        creditCustomer.id,
+      ]);
+      assert.equal(
+        (await req("/credit/sales", seller, "POST", creditDraft)).status,
+        409,
+      );
+      assert.deepEqual(
+        (await req("/inventory", admin)).data.find((x: any) => x.id === cp.id),
+        creditStock,
+      );
+
+      await server.pool.query("UPDATE app_users SET active=true WHERE id=$1", [
+        creditCustomer.id,
+      ]);
+      const secondCredit = await req("/credit/sales", seller, "POST", {
+        ...creditDraft,
+        lines: [{ productId: cp.id, quantity: 1, expectedPriceCop: 1000 }],
+      });
+      assert.equal(secondCredit.status, 201);
+      const checkoutPayload = {
+        mode: "cash_and_payment",
+        clientId: creditCustomer.id,
+        lines: [{ productId: cp.id, quantity: 1, expectedPriceCop: 1000 }],
+        cashReceived: 1500,
+        abonoCop: 500,
+      };
+      const checkoutKey = crypto.randomUUID();
+      const checkout = await req(
+        "/credit/checkout",
+        seller,
+        "POST",
+        checkoutPayload,
+        checkoutKey,
+      );
+      assert.equal(checkout.status, 201);
+      assert.equal(checkout.data.cashChange, 0);
+      assert.equal(
+        (
+          await req(
+            "/credit/checkout",
+            seller,
+            "POST",
+            checkoutPayload,
+            checkoutKey,
+          )
+        ).data.id,
+        checkout.data.id,
+      );
+      assert.equal(
+        (await req("/credit/clients/" + creditCustomer.id, seller)).data
+          .balanceCop,
+        500,
+      );
+      const beforeFailedCheckout = (await req("/inventory", admin)).data;
+      const beforeFailedOrders = (await req("/orders", admin)).data;
+      assert.equal(
+        (
+          await req("/credit/checkout", seller, "POST", {
+            ...checkoutPayload,
+            cashReceived: 2000,
+            abonoCop: 1000,
+          })
+        ).status,
+        409,
+      );
+      assert.deepEqual(
+        (await req("/inventory", admin)).data,
+        beforeFailedCheckout,
+      );
+      assert.deepEqual((await req("/orders", admin)).data, beforeFailedOrders);
+      assert.equal(
+        (await req("/credit/checkout", buyer, "POST", checkoutPayload)).status,
+        403,
+      );
     } finally {
       await server?.close();
       await root.query(`DROP SCHEMA ${schema} CASCADE`);

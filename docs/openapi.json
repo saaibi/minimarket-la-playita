@@ -121,10 +121,7 @@
                   },
                   "kind": {
                     "type": "string",
-                    "enum": [
-                      "unit",
-                      "weight"
-                    ]
+                    "enum": ["unit", "weight"]
                   },
                   "priceCop": {
                     "type": "integer",
@@ -181,11 +178,7 @@
                           "maximum": 100000000
                         }
                       },
-                      "required": [
-                        "name",
-                        "factor",
-                        "priceCop"
-                      ],
+                      "required": ["name", "factor", "priceCop"],
                       "additionalProperties": false
                     }
                   }
@@ -412,18 +405,10 @@
                 "properties": {
                   "action": {
                     "type": "string",
-                    "enum": [
-                      "accept",
-                      "ready",
-                      "pay_cash",
-                      "deliver",
-                      "cancel"
-                    ]
+                    "enum": ["accept", "ready", "pay_cash", "deliver", "cancel"]
                   }
                 },
-                "required": [
-                  "action"
-                ],
+                "required": ["action"],
                 "additionalProperties": false
               }
             }
@@ -545,10 +530,7 @@
                     "maxLength": 128
                   }
                 },
-                "required": [
-                  "email",
-                  "password"
-                ]
+                "required": ["email", "password"]
               }
             }
           }
@@ -912,10 +894,7 @@
                     "maxLength": 100
                   }
                 },
-                "required": [
-                  "challengeId",
-                  "credential"
-                ]
+                "required": ["challengeId", "credential"]
               }
             }
           }
@@ -1036,17 +1015,10 @@
                     "maxLength": 128
                   },
                   "role": {
-                    "enum": [
-                      "admin",
-                      "seller"
-                    ]
+                    "enum": ["admin", "seller"]
                   }
                 },
-                "required": [
-                  "email",
-                  "password",
-                  "role"
-                ]
+                "required": ["email", "password", "role"]
               }
             }
           }
@@ -1166,9 +1138,7 @@
                     "pattern": "^\\+[1-9]\\d{7,14}$"
                   }
                 },
-                "required": [
-                  "phone"
-                ]
+                "required": ["phone"]
               }
             }
           }
@@ -1219,10 +1189,7 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "challengeId",
-                  "code"
-                ]
+                "required": ["challengeId", "code"]
               }
             }
           }
@@ -1337,10 +1304,7 @@
                   },
                   "kind": {
                     "type": "string",
-                    "enum": [
-                      "unit",
-                      "weight"
-                    ]
+                    "enum": ["unit", "weight"]
                   },
                   "priceCop": {
                     "type": "integer",
@@ -1397,11 +1361,7 @@
                           "maximum": 100000000
                         }
                       },
-                      "required": [
-                        "name",
-                        "factor",
-                        "priceCop"
-                      ],
+                      "required": ["name", "factor", "priceCop"],
                       "additionalProperties": false
                     }
                   }
@@ -1521,19 +1481,12 @@
                           "maximum": 100000000
                         }
                       },
-                      "required": [
-                        "id",
-                        "priceCop"
-                      ],
+                      "required": ["id", "priceCop"],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": [
-                  "delta",
-                  "reason",
-                  "version"
-                ],
+                "required": ["delta", "reason", "version"],
                 "additionalProperties": false
               }
             }
@@ -1616,20 +1569,13 @@
                           "maximum": 100000000
                         }
                       },
-                      "required": [
-                        "productId",
-                        "quantity",
-                        "expectedPriceCop"
-                      ],
+                      "required": ["productId", "quantity", "expectedPriceCop"],
                       "additionalProperties": false
                     }
                   },
                   "paymentMethod": {
                     "type": "string",
-                    "enum": [
-                      "cash",
-                      "nequi"
-                    ]
+                    "enum": ["cash", "nequi"]
                   },
                   "client": {
                     "type": "object",
@@ -1644,9 +1590,7 @@
                         "maxLength": 100
                       }
                     },
-                    "required": [
-                      "name"
-                    ],
+                    "required": ["name"],
                     "additionalProperties": false
                   },
                   "cashReceived": {
@@ -1655,11 +1599,7 @@
                     "maximum": 2000000000
                   }
                 },
-                "required": [
-                  "lines",
-                  "paymentMethod",
-                  "cashReceived"
-                ],
+                "required": ["lines", "paymentMethod", "cashReceived"],
                 "additionalProperties": false
               }
             }
@@ -1747,21 +1687,13 @@
                           "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
                         }
                       },
-                      "required": [
-                        "closed",
-                        "open",
-                        "close"
-                      ],
+                      "required": ["closed", "open", "close"],
                       "additionalProperties": false
                     }
                   },
                   "override": {
                     "type": "string",
-                    "enum": [
-                      "auto",
-                      "open",
-                      "closed"
-                    ]
+                    "enum": ["auto", "open", "closed"]
                   },
                   "overrideDate": {
                     "type": "string",
@@ -1773,12 +1705,7 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": [
-                  "days",
-                  "override",
-                  "overrideDate",
-                  "version"
-                ],
+                "required": ["days", "override", "overrideDate", "version"],
                 "additionalProperties": false
               }
             }
@@ -1917,10 +1844,7 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": [
-                  "name",
-                  "contact"
-                ],
+                "required": ["name", "contact"],
                 "additionalProperties": false
               }
             }
@@ -1989,10 +1913,7 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": [
-                  "name",
-                  "contact"
-                ],
+                "required": ["name", "contact"],
                 "additionalProperties": false
               }
             }
@@ -2035,21 +1956,14 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": [
-                  "email",
-                  "role"
-                ],
+                "required": ["email", "role"],
                 "properties": {
                   "email": {
                     "type": "string",
                     "format": "email"
                   },
                   "role": {
-                    "enum": [
-                      "admin",
-                      "seller",
-                      "buyer"
-                    ]
+                    "enum": ["admin", "seller", "buyer"]
                   }
                 }
               }
@@ -2121,10 +2035,7 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": [
-                  "removed",
-                  "reason"
-                ],
+                "required": ["removed", "reason"],
                 "properties": {
                   "removed": {
                     "type": "boolean"
@@ -2154,6 +2065,287 @@
           },
           "409": {
             "description": "Venta no finalizada, estado ya aplicado o clave incompatible"
+          }
+        }
+      }
+    },
+    "/credit/clients": {
+      "get": {
+        "description": "Administrador y vendedor: cuentas registradas, no invitados. Saldos chargedCop, paidCop, balanceCop. Incluye cuentas inactivas para conservar cobro; solo activas admiten crédito nuevo.",
+        "responses": {
+          "200": {
+            "description": "Cuentas y saldos"
+          },
+          "403": {
+            "description": "Comprador sin acceso"
+          }
+        }
+      }
+    },
+    "/credit/clients/{id}": {
+      "get": {
+        "description": "Administrador y vendedor. Pedidos y líneas con precios históricos, abonos por fecha y saldo por cliente.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cuenta, orders, payments, balanceCop"
+          },
+          "403": {
+            "description": "Sin permiso"
+          },
+          "404": {
+            "description": "Cuenta no encontrada"
+          }
+        }
+      }
+    },
+    "/credit/sales": {
+      "post": {
+        "description": "Venta entregada a crédito. Solo cuenta registrada activa. Descuenta stock y conserva precios; no registra efectivo. Idempotente.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "lines": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "productId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "presentationId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "quantity": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 1000000
+                        },
+                        "expectedPriceCop": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100000000
+                        }
+                      },
+                      "required": ["productId", "quantity", "expectedPriceCop"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "clientId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": ["lines", "clientId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registro confirmado o replay"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "401": {
+            "description": "Sin sesión"
+          },
+          "403": {
+            "description": "Solo personal"
+          },
+          "409": {
+            "description": "Cliente inactivo, invitado, saldo, precio o stock cambió: revisar antes de reenviar"
+          }
+        }
+      }
+    },
+    "/credit/checkout": {
+      "post": {
+        "description": "Caja en una sola transacción. Pago completo, crédito, o pago más abono a deuda anterior. Cliente obligatorio para crédito/abono. Abono asignado a pedidos antiguos primero; validación del saldo bajo bloqueo, reversión total ante conflicto. Cambio = efectivo - productos - abono. No procesa pagos externos.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "lines": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "productId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "presentationId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "quantity": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 1000000
+                        },
+                        "expectedPriceCop": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100000000
+                        }
+                      },
+                      "required": ["productId", "quantity", "expectedPriceCop"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "clientId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "mode": {
+                    "enum": ["cash", "credit", "cash_and_payment"]
+                  },
+                  "cashReceived": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2000000000
+                  },
+                  "abonoCop": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 2000000000,
+                    "default": 0
+                  }
+                },
+                "required": ["lines", "mode"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registro confirmado o replay"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "401": {
+            "description": "Sin sesión"
+          },
+          "403": {
+            "description": "Solo personal"
+          },
+          "409": {
+            "description": "Cliente inactivo, invitado, saldo, precio o stock cambió: revisar antes de reenviar"
+          }
+        }
+      }
+    },
+    "/credit/sales/{id}/payments": {
+      "post": {
+        "description": "Administrador y vendedor. Abono en efectivo previamente recibido; bloquea pedido para impedir sobreabonos concurrentes y reutiliza idempotencia.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "amountCop": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2000000000
+                  }
+                },
+                "required": ["amountCop"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registro confirmado o replay"
+          },
+          "400": {
+            "description": "Entrada inválida"
+          },
+          "401": {
+            "description": "Sin sesión"
+          },
+          "403": {
+            "description": "Solo personal"
+          },
+          "409": {
+            "description": "Cliente inactivo, invitado, saldo, precio o stock cambió: revisar antes de reenviar"
           }
         }
       }
@@ -2204,20 +2396,13 @@
                   "maximum": 100000000
                 }
               },
-              "required": [
-                "productId",
-                "quantity",
-                "expectedPriceCop"
-              ],
+              "required": ["productId", "quantity", "expectedPriceCop"],
               "additionalProperties": false
             }
           },
           "paymentMethod": {
             "type": "string",
-            "enum": [
-              "cash",
-              "nequi"
-            ]
+            "enum": ["cash", "nequi"]
           },
           "client": {
             "type": "object",
@@ -2232,16 +2417,11 @@
                 "maxLength": 100
               }
             },
-            "required": [
-              "name"
-            ],
+            "required": ["name"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "lines",
-          "paymentMethod"
-        ],
+        "required": ["lines", "paymentMethod"],
         "additionalProperties": false
       },
       "Order": {
@@ -2260,20 +2440,10 @@
             "format": "uuid"
           },
           "status": {
-            "enum": [
-              "confirmed",
-              "accepted",
-              "ready",
-              "delivered",
-              "cancelled"
-            ]
+            "enum": ["confirmed", "accepted", "ready", "delivered", "cancelled"]
           },
           "paymentStatus": {
-            "enum": [
-              "pending",
-              "not_integrated",
-              "paid"
-            ]
+            "enum": ["pending", "not_integrated", "paid"]
           },
           "totalCop": {
             "type": "integer"
@@ -2298,10 +2468,7 @@
             "format": "uuid"
           },
           "kind": {
-            "enum": [
-              "unit",
-              "weight"
-            ]
+            "enum": ["unit", "weight"]
           },
           "stock": {
             "type": "integer"
@@ -2329,9 +2496,7 @@
       },
       "Error": {
         "type": "object",
-        "required": [
-          "code"
-        ],
+        "required": ["code"],
         "properties": {
           "code": {
             "type": "string"

@@ -82,6 +82,7 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
         "/audit",
         "/auth/users",
         "/auth/customers",
+        "/credit/clients",
       ].some((p) => path.endsWith(p))
     )
       return Response.json([]);
@@ -106,7 +107,7 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
       const nav = view.getByRole("navigation", { name: "Módulos" });
       assert.equal(
         nav.querySelectorAll("button").length,
-        role === "admin" ? 5 : role === "seller" ? 4 : 2,
+        role === "admin" ? 6 : role === "seller" ? 5 : 2,
       );
       if (role === "admin") {
         await waitFor(() =>
@@ -153,7 +154,11 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
         assert.ok(view.getByRole("button", { name: "+ Agregar" })),
       );
       fireEvent.click(view.getByRole("button", { name: "+ Agregar" }));
-      fireEvent.click(view.getByLabelText("Ver canasta"));
+      if (role !== "buyer")
+        assert.equal(view.queryByLabelText("Ver canasta"), null);
+      fireEvent.click(
+        view.getAllByRole("button", { name: "Ver canasta" }).at(-1)!,
+      );
       assert.ok(view.getByRole("dialog"));
       assert.ok(view.getByText("Total"));
       fireEvent.click(view.getByRole("button", { name: "× Cerrar" }));

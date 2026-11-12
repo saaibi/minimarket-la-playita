@@ -44,7 +44,7 @@ class ApiController {
     try {
       const healthQuery = {
         text: "SELECT version FROM schema_migrations WHERE version = $1",
-        values: ["006_sale_removal.sql"],
+        values: ["007_customer_credit.sql"],
         query_timeout: 2500,
       };
       const result = await this.store.pool.query(healthQuery);
@@ -161,6 +161,139 @@ class ApiController {
     const result = await run(id.data, parsed.data);
     res.setHeader("Idempotency-Replayed", String(!!result.replayed));
     return res.status(result.status).json(result.body);
+  }
+  @Get("credit/clients") creditClients(@Req() req: Request, @Res() res: any) {
+    if (req.actor.role === "buyer")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    return this.store.creditClients().then((v) => res.json(v));
+  }
+  @Get("credit/clients/:id") async creditDetail(
+    @Req() req: Request,
+    @Param("id") id: string,
+    @Res() res: any,
+  ) {
+    if (req.actor.role === "buyer")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    if (!z.uuid().safeParse(id).success)
+      return res.status(400).json({ code: "INVALID_ID" });
+    const result = await this.store.creditDetail(req.actor, id);
+    return res.status(result ? 200 : 404).json(result || { code: "NOT_FOUND" });
+  }
+  @Post("credit/checkout") async creditCheckout(
+    @Req() req: Request,
+    @Body() body: unknown,
+    @Res() res: any,
+  ) {
+    if (req.actor.role === "buyer")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    const parsed = z
+        .object({
+          lines: orderDraftSchema.shape.lines,
+          mode: z.enum(["cash", "credit", "cash_and_payment"]),
+          clientId: z.uuid().optional(),
+          cashReceived: z
+            .number()
+            .int()
+            .nonnegative()
+            .max(2000000000)
+            .optional(),
+          abonoCop: z.number().int().nonnegative().max(2000000000).default(0),
+        })
+        .strict()
+        .safeParse(body),
+      id = key(req);
+    if (!parsed.success || !id.success)
+      return res.status(400).json({ code: "VALIDATION_ERROR" });
+    const v = parsed.data;
+    if (
+      (v.mode !== "cash" && !v.clientId) ||
+      (v.mode === "cash_and_payment" && !v.abonoCop) ||
+      (v.mode !== "cash_and_payment" && v.abonoCop !== 0) ||
+      (v.mode !== "credit" && v.cashReceived === undefined)
+    )
+      return res.status(400).json({ code: "VALIDATION_ERROR" });
+    let client;
+    if (v.clientId) {
+      client = (
+        await this.store.pool.query(
+          "SELECT COALESCE(email,phone) AS name FROM app_users WHERE id=$1 AND active AND NOT is_guest",
+          [v.clientId],
+        )
+      ).rows[0];
+      if (!client)
+        return res
+          .status(409)
+          .json({
+            code: "CLIENT_UNAVAILABLE",
+            message: "Selecciona una cuenta registrada y activa",
+          });
+    }
+    const r = await this.store.create(
+      req.actor,
+      id.data,
+      {
+        lines: v.lines,
+        paymentMethod: "cash",
+        ...(client ? { client: { name: client.name } } : {}),
+      },
+      true,
+      v.mode === "credit" ? undefined : v.cashReceived,
+      v.mode === "credit" ? v.clientId : undefined,
+      v.mode === "cash_and_payment"
+        ? { clientId: v.clientId!, amountCop: v.abonoCop }
+        : undefined,
+    );
+    res.setHeader("Idempotency-Replayed", String(!!r.replayed));
+    return res.status(r.status).json(r.body);
+  }
+  @Post("credit/sales") async creditSale(
+    @Req() req: Request,
+    @Body() body: unknown,
+    @Res() res: any,
+  ) {
+    if (req.actor.role === "buyer")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    const parsed = z
+        .object({ lines: orderDraftSchema.shape.lines, clientId: z.uuid() })
+        .strict()
+        .safeParse(body),
+      id = key(req);
+    if (!parsed.success || !id.success)
+      return res.status(400).json({ code: "VALIDATION_ERROR" });
+    const r = await this.store.create(
+      req.actor,
+      id.data,
+      { lines: parsed.data.lines, paymentMethod: "cash" },
+      true,
+      undefined,
+      parsed.data.clientId,
+    );
+    res.setHeader("Idempotency-Replayed", String(!!r.replayed));
+    return res.status(r.status).json(r.body);
+  }
+  @Post("credit/sales/:id/payments") async creditPayment(
+    @Req() req: Request,
+    @Param("id") orderId: string,
+    @Body() body: unknown,
+    @Res() res: any,
+  ) {
+    if (req.actor.role === "buyer")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    const parsed = z
+        .object({ amountCop: z.number().int().positive().max(2000000000) })
+        .strict()
+        .safeParse(body),
+      id = key(req);
+    if (!parsed.success || !id.success || !z.uuid().safeParse(orderId).success)
+      return res.status(400).json({ code: "VALIDATION_ERROR" });
+    const r = await this.store.creditPayment(
+      req.actor,
+      id.data,
+      orderId,
+      parsed.data.amountCop,
+    );
+    res.setHeader("Idempotency-Replayed", String(!!r.replayed));
+    return res.status(r.status).json(r.body);
   }
   @Post("sales") async sale(
     @Req() req: Request,

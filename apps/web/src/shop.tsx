@@ -1,3 +1,4 @@
+import { Credits, Checkout } from "./credit.js";
 import Chip from "@mui/material/Chip";
 import Card from "@mui/material/Card";
 import { Button, Input, Select } from "./material.js";
@@ -26,6 +27,7 @@ type Order = {
   paymentStatus: string;
   paymentMethod: string;
   clientName: string;
+  creditClientId?: string;
   clientReference: string;
   totalCop: number;
   createdAt: string;
@@ -583,11 +585,15 @@ export function Shop() {
         </div>
         <p className="price">{money(o.totalCop)}</p>
         <small>
-          {o.paymentStatus === "paid"
-            ? "Efectivo confirmado"
-            : o.paymentMethod === "nequi"
-              ? "Nequi pendiente · integración no disponible"
-              : "Efectivo pendiente"}
+          {o.creditClientId
+            ? o.paymentStatus === "paid"
+              ? "Crédito saldado"
+              : "Crédito pendiente"
+            : o.paymentStatus === "paid"
+              ? "Efectivo confirmado"
+              : o.paymentMethod === "nequi"
+                ? "Nequi pendiente · integración no disponible"
+                : "Efectivo pendiente"}
         </small>
         {detail && <Button onClick={() => setSelected(o)}>Ver detalle</Button>}
         {!["delivered", "cancelled"].includes(o.status) && (
@@ -633,7 +639,8 @@ export function Shop() {
   }
   const filteredOrders = orders.filter((o) =>
     view === "history"
-      ? o.status === "delivered" && o.paymentStatus === "paid"
+      ? o.status === "delivered" &&
+        (o.paymentStatus === "paid" || !!o.creditClientId)
       : orderFilter === "all" || !["delivered", "cancelled"].includes(o.status),
   );
   return (
@@ -666,67 +673,74 @@ export function Shop() {
         </div>
       </aside>
       <div className="shell">
-        <header>
-          <div className="header-brand">
-            <Brand compact />
-            <div>
-              <Chip
-                className="store-status"
-                size="small"
-                role="status"
-                aria-live="polite"
-                label={
-                  open === null
-                    ? "Consultando horario"
-                    : open
-                      ? "Abierta"
-                      : "Cerrada"
-                }
-                color={open === null ? "default" : open ? "success" : "error"}
-                variant="outlined"
-              />
+        <div className="sticky-shop-top">
+          <header>
+            <div className="header-brand">
+              <Brand compact />
+              <div>
+                <Chip
+                  className="store-status"
+                  size="small"
+                  role="status"
+                  aria-live="polite"
+                  label={
+                    open === null
+                      ? "Consultando horario"
+                      : open
+                        ? "Abierta"
+                        : "Cerrada"
+                  }
+                  color={open === null ? "default" : open ? "success" : "error"}
+                  variant="outlined"
+                />
+              </div>
             </div>
-          </div>
-          <div className="header-actions">
-            <Button
-              className="icon-button"
-              aria-label="Ver canasta"
-              onClick={() => setCartOpen(true)}
-            >
-              <Icon name="basket" />
-              {cart.length > 0 && <span className="badge">{cart.length}</span>}
-            </Button>
-            <Button
-              className="icon-button"
-              aria-label="Notificaciones"
-              onClick={() => {
-                setNoticeTab("orders");
-                setBellOpen(true);
-              }}
-            >
-              <Icon name="bell" />
-              {notices.some((n) => !n.read) && (
-                <span className="badge">
-                  {notices.filter((n) => !n.read).length}
-                </span>
+            <div className="header-actions">
+              {view !== "pos" && (
+                <Button
+                  className="icon-button"
+                  aria-label="Ver canasta"
+                  onClick={() => setCartOpen(true)}
+                >
+                  <Icon name="basket" />
+                  {cart.length > 0 && (
+                    <span className="badge">{cart.length}</span>
+                  )}
+                </Button>
               )}
-            </Button>
-            <div className="identity">
-              <strong>{roles[role]}</strong>
-              <small>{session.actor.label}</small>
+              <Button
+                className="icon-button"
+                aria-label="Notificaciones"
+                onClick={() => {
+                  setNoticeTab("orders");
+                  setBellOpen(true);
+                }}
+              >
+                <Icon name="bell" />
+                {notices.some((n) => !n.read) && (
+                  <span className="badge">
+                    {notices.filter((n) => !n.read).length}
+                  </span>
+                )}
+              </Button>
+              <div className="identity">
+                <strong>{roles[role]}</strong>
+                <small>{session.actor.label}</small>
+              </div>
+              <Button onClick={() => void logout()}>Salir</Button>
             </div>
-            <Button onClick={() => void logout()}>Salir</Button>
-          </div>
-        </header>
-        <div className="environment-banner">RECOGIDA EN TIENDA · COP</div>
-        {cart.length > 0 && (
-          <div className="cart-dock">
-            <span>
-              {cart.length} líneas en la canasta <strong>{money(total)}</strong>
-            </span>
-            <Button onClick={() => setCartOpen(true)}>Ver canasta</Button>
-          </div>
-        )}
+          </header>
+          <div className="environment-banner">RECOGIDA EN TIENDA · COP</div>
+          {cart.length > 0 && (
+            <div className="cart-dock">
+              <span>
+                {cart.length} líneas en la canasta{" "}
+                <strong>{money(total)}</strong>
+              </span>
+              <Button onClick={() => setCartOpen(true)}>Ver canasta</Button>
+            </div>
+          )}
+        </div>
         <main>
           <p className="status" role="status">
             {message}
@@ -842,6 +856,15 @@ export function Shop() {
                 </p>
               )}
             </>
+          )}
+          {view === "credit" && staff && (
+            <Credits
+              owner={session.actor.id}
+              onChange={async (saleRecovered) => {
+                if (saleRecovered) setCart([]);
+                await reload();
+              }}
+            />
           )}
           {(view === "orders" || view === "history") && (
             <>
@@ -1011,7 +1034,7 @@ export function Shop() {
           ) : (
             <p className="empty">Tu canasta está vacía.</p>
           )}
-          {staff && (
+          {staff && view !== "pos" && (
             <label>
               Cliente (opcional)
               <Select
@@ -1060,7 +1083,7 @@ export function Shop() {
               </Select>
             </label>
           )}
-          {staff && view === "pos" && (
+          {staff && view === "pos" && pendingSale && (
             <>
               <label>
                 Efectivo recibido (COP)
@@ -1094,6 +1117,25 @@ export function Shop() {
                 ? "No se procesa ni confirma un pago Nequi desde la aplicación."
                 : "La tienda confirma el pago en efectivo al recoger."}
           </p>
+          {staff && view === "pos" && !pendingSale && (
+            <Checkout
+              owner={session.actor.id}
+              lines={cart}
+              total={total}
+              onBusy={setBusy}
+              onSaved={() => {
+                setCart([]);
+                setCartOpen(false);
+                setCash("");
+                setMessage("Venta registrada");
+                void reload().catch(() =>
+                  setMessage(
+                    "Registro guardado; vuelve a consultar los datos.",
+                  ),
+                );
+              }}
+            />
+          )}
           {revision && (
             <p>
               Se enviará una revisión nueva y se conservará el pedido local
@@ -1101,19 +1143,21 @@ export function Shop() {
             </p>
           )}
           <p role="alert">{message}</p>
-          <Button
-            className="primary"
-            disabled={busy || !cart.length}
-            onClick={() => void send()}
-          >
-            {busy
-              ? "Procesando…"
-              : staff && view === "pos"
-                ? "Confirmar efectivo y registrar venta"
-                : revision
-                  ? "Enviar revisión"
-                  : "Enviar pedido"}
-          </Button>
+          {(!staff || view !== "pos" || pendingSale) && (
+            <Button
+              className="primary"
+              disabled={busy || !cart.length}
+              onClick={() => void send()}
+            >
+              {busy
+                ? "Procesando…"
+                : staff && view === "pos"
+                  ? "Confirmar efectivo y registrar venta"
+                  : revision
+                    ? "Enviar revisión"
+                    : "Enviar pedido"}
+            </Button>
+          )}
           <Button disabled={busy} onClick={() => setCartOpen(false)}>
             Cerrar canasta
           </Button>
@@ -1142,7 +1186,7 @@ export function Shop() {
               <strong>{money(l.totalCop)}</strong>
             </div>
           ))}
-          {selected.channel === "pos" && (
+          {selected.channel === "pos" && !selected.creditClientId && (
             <p>
               Recibido: {money((selected as any).cashReceived || 0)} · Cambio:{" "}
               {money((selected as any).cashChange || 0)}
@@ -1151,7 +1195,8 @@ export function Shop() {
           {admin &&
             selected.status === "delivered" &&
             selected.paymentStatus === "paid" &&
-            selected.paymentMethod === "cash" && (
+            selected.paymentMethod === "cash" &&
+            !selected.creditClientId && (
               <section className="panel">
                 <p>
                   Retirar un registro de prueba lo excluye de Ventas y sus
@@ -1246,7 +1291,7 @@ export function ProductCard({
   const pres = p.presentations.find((v) => v.id === id) || p.presentations[0],
     price = pres?.priceCop ?? p.priceCop;
   return (
-    <Card component="article" className="card" variant="outlined">
+    <Card component="article" className="card product-card" variant="outlined">
       <div
         className={"product-art" + (p.photo ? " has-photo" : "")}
         aria-hidden="true"
