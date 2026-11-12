@@ -107,7 +107,7 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
       const nav = view.getByRole("navigation", { name: "Módulos" });
       assert.equal(
         nav.querySelectorAll("button").length,
-        role === "admin" ? 6 : role === "seller" ? 5 : 3,
+        role === "admin" ? 6 : role === "seller" ? 5 : 2,
       );
       if (role === "admin") {
         await waitFor(() =>

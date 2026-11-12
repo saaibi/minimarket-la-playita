@@ -68,6 +68,28 @@ test("Android SQLite: reparar catálogo/POS ausentes en versión 1, conservando 
     await a.init();
     assert.equal((await a.pendingSale())!.request_key, key);
     assert.equal((await a.list())[0]!.request_key, "legacy-key");
+    const attempt = JSON.stringify({
+      path: "/credit/checkout",
+      body: "{}",
+      key: "credit-key",
+    });
+    await a.prepareCreditAttempt("credit-key", attempt);
+    const reopened = new Outbox(db, "owner-a");
+    await reopened.init();
+    assert.equal((await reopened.pendingCreditAttempt())!.payload, attempt);
+    assert.equal(await b.pendingCreditAttempt(), null);
+    await assert.rejects(
+      a.prepareCreditAttempt("other-key", attempt),
+      /pendiente/,
+    );
+    await b.finishCreditAttempt("credit-key");
+    assert.equal((await a.pendingCreditAttempt())!.request_key, "credit-key");
+    await a.finishCreditAttempt("wrong-key");
+    assert.ok(await a.pendingCreditAttempt());
+    await a.finishCreditAttempt("credit-key");
+    assert.equal(await a.pendingCreditAttempt(), null);
+    assert.equal((await a.pendingSale())!.request_key, key);
+    assert.equal((await a.list())[0]!.request_key, "legacy-key");
     assert.ok(db.executed.includes("BEGIN IMMEDIATE"));
     assert.ok(db.executed.includes("COMMIT"));
   } finally {

@@ -33,3 +33,7 @@ Escrituras con Idempotency-Key. El cuerpo y la clave se guardan localmente por u
 Pruebas: elegibilidad de los tres roles; permiso admin; rechazo de invitado/contacto/inactivo/no habilitado; crédito completo, parcial, pago exacto, abono y cambio; abonos concurrentes; snapshot de productos; aislamiento entre compradores; compras pagadas en historial propio; rollback íntegro por saldo/total/stock; reintentos y versiones previas; canasta igual entre módulos; filtros sin escrituras. Las pruebas PostgreSQL se ejecutan en CI con datos aislados, sin registrar operaciones financieras ficticias en producción.
 
 El endpoint conserva los modos antiguos por compatibilidad con intentos pendientes; la interfaz nueva utiliza mode=auto, cashReceived, expectedTotalCop y expectedBalanceCop. Se envía también expectedCreditEnabled para detectar cambios del permiso. Un cambio del permiso, saldo o total respecto al resumen obliga a actualizar y revisar antes de confirmar.
+
+La navegación del comprador muestra Mi cuenta únicamente con crédito habilitado; Mis pedidos permanece disponible. Se vuelve a consultar el permiso al recuperar el foco.
+
+Android conserva los intentos de cobro, crédito y abono en la tabla SQLite `credit_attempts`, aislados por cuenta. La actualización es aditiva sobre la versión local 1: conserva catálogo, pedidos y ventas pendientes. Migra los intentos anteriores de localStorage antes de retirarlos y mantiene la misma clave para reintentos sin respuesta confirmada. No requiere desinstalar ni borrar datos.

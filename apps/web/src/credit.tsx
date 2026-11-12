@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { auth } from "./session.js";
+import { openNativeOutbox, type Outbox } from "@playita/mobile";
+import { native, auth } from "./session.js";
 import { Button, Input, Select } from "./material.js";
 import { Modal, money, roles } from "./ui.js";
 import type { OrderDraft } from "@playita/shared";
 type Pending = { path: string; body: string; key: string };
 const storageKey = (owner: string) => "playita-credit-attempt:" + owner;
-function pending(owner: string): Pending | null {
+function browserPending(owner: string): Pending | null {
   const raw = localStorage.getItem(storageKey(owner));
   if (!raw) return null;
   const p = JSON.parse(raw);
@@ -17,20 +18,54 @@ function pending(owner: string): Pending | null {
     throw Error("Revisa el intento pendiente antes de continuar");
   return p;
 }
+const nativeBoxes = new Map<string, Promise<Outbox>>();
+function creditBox(owner: string) {
+  if (!nativeBoxes.has(owner))
+    nativeBoxes.set(
+      owner,
+      openNativeOutbox(owner).catch((error) => {
+        nativeBoxes.delete(owner);
+        throw error;
+      }),
+    );
+  return nativeBoxes.get(owner)!;
+}
+async function pending(owner: string): Promise<Pending | null> {
+  if (!native) return browserPending(owner);
+  const box = await creditBox(owner),
+    legacy = browserPending(owner);
+  if (legacy) {
+    await box.prepareCreditAttempt(legacy.key, JSON.stringify(legacy));
+    localStorage.removeItem(storageKey(owner));
+  }
+  const row = await box.pendingCreditAttempt();
+  return row ? JSON.parse(row.payload) : null;
+}
+async function saveAttempt(owner: string, attempt: Pending) {
+  if (native)
+    await (
+      await creditBox(owner)
+    ).prepareCreditAttempt(attempt.key, JSON.stringify(attempt));
+  else localStorage.setItem(storageKey(owner), JSON.stringify(attempt));
+}
+async function finishAttempt(owner: string, key: string) {
+  if (native) await (await creditBox(owner)).finishCreditAttempt(key);
+  else localStorage.removeItem(storageKey(owner));
+}
 export async function creditMutation(
   owner: string,
   path: string,
   payload: unknown,
 ) {
   const body = JSON.stringify(payload),
-    old = pending(owner);
+    old = await pending(owner);
   if (old && (old.path !== path || old.body !== body))
     throw Error(
       "Hay una operación sin confirmar. Reinténtala desde Créditos antes de registrar otra.",
     );
   const attempt = old || { path, body, key: crypto.randomUUID() };
   // Persist before sending. Unknown network/5xx outcomes must reuse this key.
-  localStorage.setItem(storageKey(owner), JSON.stringify(attempt));
+  await saveAttempt(owner, attempt);
   const response = await auth.request(
     path,
     { method: "POST", headers: { "Idempotency-Key": attempt.key }, body },
@@ -43,7 +78,7 @@ export async function creditMutation(
     response.status === 422 ||
     (response.status === 409 && result.code !== "IDEMPOTENCY_MISMATCH")
   )
-    localStorage.removeItem(storageKey(owner));
+    await finishAttempt(owner, attempt.key);
   if (!response.ok)
     throw Error(
       result.message ||
@@ -105,11 +140,9 @@ export function Checkout({
   }
   useEffect(() => {
     void loadClients();
-    try {
-      setAttempt(pending(owner));
-    } catch (e: any) {
-      setError(e.message);
-    }
+    void pending(owner)
+      .then(setAttempt)
+      .catch((e) => setError(e.message));
   }, [owner]);
   const client = clients.find((c) => c.id === clientId),
     balance = client?.balanceCop || 0,
@@ -145,7 +178,7 @@ export function Checkout({
     } finally {
       setBusy(false);
       onBusy(false);
-      setAttempt(pending(owner));
+      setAttempt(await pending(owner));
     }
   }
   return (
@@ -317,7 +350,7 @@ export function Credits({
     [attempt, setAttempt] = useState<Pending | null>(null);
   async function load() {
     setClients(await get(owner, "/credit/clients"));
-    setAttempt(pending(owner));
+    setAttempt(await pending(owner));
   }
   useEffect(() => {
     void load().catch((e) => setMessage(e.message));
@@ -336,7 +369,7 @@ export function Credits({
       setMessage(e.message);
     } finally {
       setBusy(false);
-      setAttempt(pending(owner));
+      setAttempt(await pending(owner));
     }
   }
   const normalize = (value: string) =>

@@ -26,6 +26,7 @@ const SQLITE_STATEMENTS = [
   "CREATE INDEX IF NOT EXISTS outbox_owner ON outbox(owner_id,status,next_attempt_at)",
   "CREATE TABLE IF NOT EXISTS catalog_cache(owner_id TEXT PRIMARY KEY,payload TEXT NOT NULL,updated_at INTEGER NOT NULL)",
   "CREATE TABLE IF NOT EXISTS pos_attempts(request_key TEXT PRIMARY KEY,owner_id TEXT NOT NULL,payload TEXT NOT NULL,state TEXT NOT NULL,response TEXT,created_at INTEGER NOT NULL)",
+  "CREATE TABLE IF NOT EXISTS credit_attempts(owner_id TEXT PRIMARY KEY,request_key TEXT NOT NULL,payload TEXT NOT NULL,created_at INTEGER NOT NULL)",
   "PRAGMA user_version=1",
 ];
 export const SQLITE_SCHEMA = SQLITE_STATEMENTS.join(";\n") + ";";
@@ -61,9 +62,9 @@ export class Outbox {
         for (const statement of SQLITE_STATEMENTS)
           await this.db.execute(statement);
         const tables = await this.db.query<{ name: string }>(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('outbox','catalog_cache','pos_attempts')",
+          "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('outbox','catalog_cache','pos_attempts','credit_attempts')",
         );
-        if (tables.length !== 3)
+        if (tables.length !== 4)
           throw Error(
             "No fue posible preparar el almacenamiento local; tus pendientes se conservan",
           );
@@ -73,6 +74,44 @@ export class Outbox {
         throw error;
       }
     });
+  }
+  pendingCreditAttempt() {
+    return this.exclusive(
+      async () =>
+        (
+          await this.db.query<{ request_key: string; payload: string }>(
+            "SELECT request_key,payload FROM credit_attempts WHERE owner_id=?",
+            [this.owner],
+          )
+        )[0] || null,
+    );
+  }
+  prepareCreditAttempt(key: string, payload: string) {
+    return this.exclusive(async () => {
+      const old = (
+        await this.db.query<{ request_key: string; payload: string }>(
+          "SELECT request_key,payload FROM credit_attempts WHERE owner_id=?",
+          [this.owner],
+        )
+      )[0];
+      if (old) {
+        if (old.request_key !== key || old.payload !== payload)
+          throw Error("Retoma primero la operación de crédito pendiente");
+        return;
+      }
+      await this.db.run(
+        "INSERT INTO credit_attempts(owner_id,request_key,payload,created_at) VALUES(?,?,?,?)",
+        [this.owner, key, payload, Date.now()],
+      );
+    });
+  }
+  finishCreditAttempt(key: string) {
+    return this.exclusive(() =>
+      this.db.run(
+        "DELETE FROM credit_attempts WHERE owner_id=? AND request_key=?",
+        [this.owner, key],
+      ),
+    );
   }
   enqueue(draft: OrderDraft, key = crypto.randomUUID(), now = Date.now()) {
     return this.exclusive(async () => {

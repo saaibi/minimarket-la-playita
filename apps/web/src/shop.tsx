@@ -104,6 +104,34 @@ export function Shop() {
     [busy, setBusy] = useState(false),
     [revision, setRevision] = useState<string | null>(null),
     [pendingSale, setPendingSale] = useState(false);
+  const [ownCreditEnabled, setOwnCreditEnabled] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const refreshCredit = async () => {
+      if (staff || session.mode !== "authenticated") return;
+      try {
+        const r = await auth.request("/credit/me", {}, session.actor.id);
+        if (r.ok) {
+          const profile = await r.json();
+          if (active) {
+            setOwnCreditEnabled(profile.creditEnabled === true);
+            if (!profile.creditEnabled)
+              setView((current) =>
+                current === "profile" ? "catalog" : current,
+              );
+          }
+        }
+      } catch {
+        /* Keep current navigation while offline. */
+      }
+    };
+    void refreshCredit();
+    window.addEventListener("focus", refreshCredit);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", refreshCredit);
+    };
+  }, [session.actor.id, session.mode, staff]);
   const box = useRef<Outbox | null>(null),
     worker = useRef<Synchronizer | null>(null),
     webAttempt = useRef<{ key: string; payload: string; route: string } | null>(
@@ -656,7 +684,9 @@ export function Shop() {
         <nav aria-label="Módulos">
           {modulesFor(role)
             .filter(
-              ([id]) => id !== "settings" || session.mode === "authenticated",
+              ([id]) =>
+                (id !== "settings" || session.mode === "authenticated") &&
+                (id !== "profile" || ownCreditEnabled),
             )
             .map(([id, label]) => (
               <Button
@@ -862,7 +892,7 @@ export function Shop() {
               )}
             </>
           )}
-          {view === "profile" && !staff && (
+          {view === "profile" && !staff && ownCreditEnabled && (
             <BuyerProfile
               owner={session.actor.id}
               guest={!!session.actor.guest}
