@@ -466,14 +466,20 @@ export function Credits({
       </p>
       <div className="cards">
         {visibleClients.map((c) => (
-          <article className="panel" key={c.id}>
+          <article className="panel credit-account-card" key={c.id}>
             <h2>{c.name}</h2>
             <small>
               Crédito {c.creditEnabled ? "habilitado" : "deshabilitado"}
             </small>
-            <small>{c.contact}</small>
-            <p>
-              Debe: <strong>{money(c.balanceCop)}</strong>
+            {c.contact && <small>{c.contact}</small>}
+            <p
+              className={
+                "credit-account-balance " +
+                (c.balanceCop > 0 ? "outstanding" : "settled")
+              }
+            >
+              {c.balanceCop > 0 ? "Debe:" : "Al día:"}{" "}
+              <strong>{money(c.balanceCop)}</strong>
             </p>
             <small>
               Créditos {money(c.chargedCop)} · Abonos {money(c.paidCop)}

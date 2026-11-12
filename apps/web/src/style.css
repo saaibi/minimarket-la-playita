@@ -1337,3 +1337,38 @@ label .MuiInputBase-root {
     padding: 6px 10px;
   }
 }
+
+.credit-module .credit-account-card {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  min-width: 0;
+}
+.credit-account-card h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.credit-account-card > small {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+.credit-account-card .credit-account-balance {
+  margin: 3px 0;
+  font-size: 1.125rem;
+}
+.credit-account-balance.outstanding {
+  color: #9b1c1c;
+}
+.credit-account-balance.settled {
+  color: #246144;
+}
+.credit-account-card > .MuiButton-root {
+  margin-top: 3px;
+  font-size: 0.8125rem;
+  padding: 6px 10px;
+}
