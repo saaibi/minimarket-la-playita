@@ -211,7 +211,11 @@ test(
       // A pending POS replay from the previous APK keeps its original request hash.
       const legacyHash = createHash("sha256")
         .update(
-          canonical({ operation: "create-sale", draft, cashReceived: 15000 }),
+          canonical({
+            operation: "create-sale",
+            draft: { ...draft, cashReceived: 15000 },
+            cashReceived: 15000,
+          }),
         )
         .digest("hex");
       await server.pool.query(
@@ -785,6 +789,134 @@ test(
         (await req("/credit/checkout", buyer, "POST", checkoutPayload)).status,
         403,
       );
+
+      const staffBorrowers = (await req("/auth/users", admin)).data;
+      for (const role of ["admin", "seller"]) {
+        const borrower = staffBorrowers.find((u: any) => u.role === role);
+        assert.ok(borrower);
+        assert.equal(
+          (
+            await req("/auth/users/" + borrower.id + "/credit", admin, "POST", {
+              creditEnabled: true,
+            })
+          ).status,
+          200,
+        );
+        const eligible = (await req("/credit/clients", seller)).data.find(
+          (c: any) => c.id === borrower.id,
+        );
+        assert.equal(eligible.role, role);
+        assert.equal(eligible.creditEnabled, true);
+        const staffCredit = await req("/credit/sales", seller, "POST", {
+          clientId: borrower.id,
+          lines: [{ productId: cp.id, quantity: 1, expectedPriceCop: 1000 }],
+        });
+        assert.equal(staffCredit.status, 201);
+        assert.equal(staffCredit.data.creditClientId, borrower.id);
+        assert.equal(
+          (await req("/credit/clients/" + borrower.id, seller)).data.balanceCop,
+          1000,
+        );
+      }
+
+      // One cash input: zero, partial, exact, prior-debt payment, then change.
+      await req(permissionPath, admin, "POST", { creditEnabled: true });
+      const autoProduct = (
+        await req("/inventory", admin, "POST", {
+          ...input,
+          name: "Producto cobro unificado",
+          initialStock: 10,
+        })
+      ).data;
+      const autoLines = [
+        { productId: autoProduct.id, quantity: 1, expectedPriceCop: 1000 },
+      ];
+      async function autoPay(cashReceived: number, key = crypto.randomUUID()) {
+        const balance = (
+          await req("/credit/clients/" + creditCustomer.id, seller)
+        ).data.balanceCop;
+        const body = {
+          mode: "auto",
+          clientId: creditCustomer.id,
+          lines: autoLines,
+          cashReceived,
+          expectedTotalCop: 1000,
+          expectedBalanceCop: balance,
+        };
+        return {
+          reply: await req("/credit/checkout", seller, "POST", body, key),
+          body,
+          key,
+          balance,
+        };
+      }
+      const zero = await autoPay(0);
+      assert.equal(zero.reply.status, 201);
+      assert.equal(zero.reply.data.paymentStatus, "pending");
+      const partial = await autoPay(400);
+      assert.equal(partial.reply.status, 201);
+      assert.equal(partial.reply.data.cashReceived, 400);
+      const partialDetail = (
+        await req("/credit/clients/" + creditCustomer.id, seller)
+      ).data.orders.find((o: any) => o.id === partial.reply.data.id);
+      assert.equal(partialDetail.paidCop, 400);
+      assert.equal(partialDetail.balanceCop, 600);
+      assert.equal(
+        (
+          await req(
+            "/credit/checkout",
+            seller,
+            "POST",
+            partial.body,
+            partial.key,
+          )
+        ).replayed,
+        "true",
+      );
+      const exact = await autoPay(1000);
+      assert.equal(exact.reply.status, 201);
+      assert.equal(exact.reply.data.cashChange, 0);
+      const plus = await autoPay(1500);
+      assert.equal(plus.reply.status, 201);
+      assert.equal(plus.reply.data.cashChange, 0);
+      const finalBalance = (
+        await req("/credit/clients/" + creditCustomer.id, seller)
+      ).data.balanceCop;
+      const finish = await autoPay(1000 + finalBalance + 500);
+      assert.equal(finish.reply.status, 201);
+      assert.equal(finish.reply.data.cashChange, 500);
+      assert.equal(
+        (await req("/credit/me", registeredBuyer)).data.balanceCop,
+        0,
+      );
+      const beforeRejected = (await req("/inventory", admin)).data;
+      assert.equal(
+        (
+          await req("/credit/checkout", seller, "POST", {
+            mode: "auto",
+            clientId: creditCustomer.id,
+            lines: autoLines,
+            cashReceived: 0,
+            expectedTotalCop: 1000,
+            expectedBalanceCop: 1,
+          })
+        ).data.code,
+        "CREDIT_BALANCE_CHANGED",
+      );
+      assert.equal(
+        (
+          await req("/credit/checkout", seller, "POST", {
+            mode: "auto",
+            clientId: creditCustomer.id,
+            lines: autoLines,
+            cashReceived: 0,
+            expectedTotalCop: 999,
+            expectedBalanceCop: 0,
+          })
+        ).data.code,
+        "TOTAL_CHANGED",
+      );
+      assert.deepEqual((await req("/inventory", admin)).data, beforeRejected);
     } finally {
       await server?.close();
       await root.query(`DROP SCHEMA ${schema} CASCADE`);

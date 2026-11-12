@@ -17,7 +17,7 @@ test("Google web: botón oficial directo, un clic y sin cuadro intermedio", asyn
     value: dom.window.navigator,
   });
   const React = await import("react");
-  const { render, fireEvent, waitFor, cleanup } =
+  const { render, fireEvent, waitFor, cleanup, act } =
     await import("@testing-library/react");
   const originalFetch = globalThis.fetch;
   let verified = 0,
@@ -79,9 +79,12 @@ test("Google web: botón oficial directo, un clic y sin cuadro intermedio", asyn
   try {
     const { GoogleLogin } = await import("../apps/web/src/google-login.js");
     const busy: boolean[] = [];
-    const view = render(
-      <GoogleLogin disabled={false} onBusy={(v) => busy.push(v)} />,
-    );
+    let view!: ReturnType<typeof render>;
+    await act(async () => {
+      view = render(
+        <GoogleLogin disabled={false} onBusy={(v) => busy.push(v)} />,
+      );
+    });
     await waitFor(() => assert.equal(rendered, 1), { timeout: 5000 });
     assert.equal(view.queryByRole("dialog"), null);
     assert.equal(view.queryByText(/Elige tu cuenta/), null);

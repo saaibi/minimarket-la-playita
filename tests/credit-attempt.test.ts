@@ -110,30 +110,120 @@ test("Canasta: pago más abono muestra reparto y confirma una sola solicitud", a
     await waitFor(() =>
       assert.ok(view.getByRole("option", { name: "cliente@example.invalid" })),
     );
-    fireEvent.click(view.getByRole("button", { name: "Pago + abono" }));
+
     fireEvent.change(view.getByRole("combobox"), {
       target: { value: clientId },
     });
     fireEvent.change(view.getByLabelText("Efectivo recibido (COP)"), {
       target: { value: "10000" },
     });
-    assert.ok(view.getByText(/Saldo restante/).textContent?.includes("2.000"));
+    assert.ok(
+      view
+        .getByText(/Saldo después de confirmar/)
+        .textContent?.includes("2.000"),
+    );
     fireEvent.click(view.getByRole("button", { name: /Cobrar y abonar/ }));
     await waitFor(() => assert.equal(saved, true));
     assert.equal(requests.length, 1);
     assert.equal(requests[0].path, "/credit/checkout");
-    assert.equal(requests[0].body.abonoCop, 3000);
+    assert.equal(requests[0].body.mode, "auto");
+    assert.equal(requests[0].body.expectedBalanceCop, 5000);
     assert.equal(requests[0].body.cashReceived, 10000);
     assert.equal(requests[0].body.clientId, clientId);
-    fireEvent.click(view.getByRole("button", { name: "A crédito" }));
+    fireEvent.change(view.getByLabelText("Efectivo recibido (COP)"), {
+      target: { value: "0" },
+    });
     assert.equal(
       (
         view.getByRole("button", {
-          name: "Anotar a crédito",
+          name: /Anotar a crédito/,
         }) as HTMLButtonElement
       ).disabled,
       true,
     );
+  } finally {
+    cleanup();
+    auth.request = original;
+    dom.window.close();
+  }
+});
+test("Créditos: solo habilitados por defecto, búsqueda y deudas deshabilitadas accesibles", async () => {
+  const dom = new JSDOM("<html><body></body></html>", {
+    url: "http://localhost",
+  });
+  Object.assign(globalThis, {
+    window: dom.window,
+    document: dom.window.document,
+    HTMLElement: dom.window.HTMLElement,
+    localStorage: dom.window.localStorage,
+    IS_REACT_ACT_ENVIRONMENT: true,
+  });
+  const React = await import("react"),
+    { render, fireEvent, waitFor, cleanup } =
+      await import("@testing-library/react"),
+    { auth } = await import("../apps/web/src/session.js"),
+    { Credits } = await import("../apps/web/src/credit.js");
+  const original = auth.request;
+  let writes = 0;
+  auth.request = async (_p, init) => {
+    if (init?.method) writes++;
+    return Response.json([
+      {
+        id: "a",
+        name: "ana@example.invalid",
+        creditEnabled: true,
+        balanceCop: 0,
+        chargedCop: 0,
+        paidCop: 0,
+      },
+      {
+        id: "b",
+        name: "bruno@example.invalid",
+        creditEnabled: true,
+        balanceCop: 1000,
+        chargedCop: 1000,
+        paidCop: 0,
+      },
+      {
+        id: "c",
+        name: "carla@example.invalid",
+        creditEnabled: false,
+        balanceCop: 500,
+        chargedCop: 500,
+        paidCop: 0,
+      },
+    ]);
+  };
+  try {
+    const view = render(
+      React.createElement(Credits, {
+        owner: "seller-filter",
+        onChange: async () => {},
+      }),
+    );
+    await waitFor(() =>
+      assert.ok(view.getByRole("heading", { name: "ana@example.invalid" })),
+    );
+    assert.equal(
+      view.queryByRole("heading", { name: "carla@example.invalid" }),
+      null,
+    );
+    fireEvent.change(view.getByLabelText("Buscar cuenta"), {
+      target: { value: "bruno" },
+    });
+    assert.equal(
+      view.queryByRole("heading", { name: "ana@example.invalid" }),
+      null,
+    );
+    assert.ok(view.getByRole("heading", { name: "bruno@example.invalid" }));
+    fireEvent.change(view.getByLabelText("Buscar cuenta"), {
+      target: { value: "" },
+    });
+    fireEvent.change(view.getByLabelText("Mostrar"), {
+      target: { value: "pending" },
+    });
+    assert.ok(view.getByRole("heading", { name: "carla@example.invalid" }));
+    assert.equal(writes, 0);
   } finally {
     cleanup();
     auth.request = original;

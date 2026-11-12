@@ -164,18 +164,19 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
       assert.ok(view.getByRole("dialog"));
       assert.ok(view.getByText("Total"));
       if (role !== "buyer") {
-        fireEvent.click(view.getByRole("button", { name: "A crédito" }));
+        fireEvent.change(view.getByLabelText("Efectivo recibido (COP)"), {
+          target: { value: "0" },
+        });
         fireEvent.click(view.getByRole("button", { name: "× Cerrar" }));
         fireEvent.click(view.getByRole("button", { name: "Inventario" }));
         fireEvent.click(view.getByLabelText("Ver canasta"));
         assert.equal(
-          view
-            .getByRole("button", { name: "A crédito" })
-            .getAttribute("aria-pressed"),
-          "true",
+          (view.getByLabelText("Efectivo recibido (COP)") as HTMLInputElement)
+            .value,
+          "0",
         );
         assert.equal(view.queryByLabelText("Forma de pago"), null);
-        assert.ok(view.getByRole("button", { name: "Anotar a crédito" }));
+        assert.ok(view.getByRole("button", { name: /Anotar a crédito/ }));
       }
 
       fireEvent.click(view.getByRole("button", { name: "× Cerrar" }));

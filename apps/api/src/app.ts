@@ -197,7 +197,9 @@ class ApiController {
     const parsed = z
         .object({
           lines: orderDraftSchema.shape.lines,
-          mode: z.enum(["cash", "credit", "cash_and_payment"]),
+          mode: z
+            .enum(["cash", "credit", "cash_and_payment", "auto"])
+            .default("auto"),
           clientId: z.uuid().optional(),
           cashReceived: z
             .number()
@@ -206,20 +208,61 @@ class ApiController {
             .max(2000000000)
             .optional(),
           abonoCop: z.number().int().nonnegative().max(2000000000).default(0),
+          expectedTotalCop: z
+            .number()
+            .int()
+            .nonnegative()
+            .max(2000000000)
+            .optional(),
+          expectedBalanceCop: z
+            .number()
+            .int()
+            .nonnegative()
+            .max(Number.MAX_SAFE_INTEGER)
+            .optional(),
         })
         .strict()
         .safeParse(body),
       id = key(req);
     if (!parsed.success || !id.success)
       return res.status(400).json({ code: "VALIDATION_ERROR" });
-    const v = parsed.data;
+    const v = parsed.data,
+      automatic = v.mode === "auto";
     if (
-      (v.mode !== "cash" && !v.clientId) ||
-      (v.mode === "cash_and_payment" && !v.abonoCop) ||
-      (v.mode !== "cash_and_payment" && v.abonoCop !== 0) ||
-      (v.mode !== "credit" && v.cashReceived === undefined)
+      automatic &&
+      (v.cashReceived === undefined ||
+        v.expectedTotalCop === undefined ||
+        (v.clientId && v.expectedBalanceCop === undefined) ||
+        (!v.clientId && (v.expectedBalanceCop || 0) !== 0))
     )
       return res.status(400).json({ code: "VALIDATION_ERROR" });
+    const mode = automatic
+      ? v.cashReceived! < v.expectedTotalCop!
+        ? "credit"
+        : v.clientId &&
+            v.cashReceived! > v.expectedTotalCop! &&
+            (v.expectedBalanceCop || 0) > 0
+          ? "cash_and_payment"
+          : "cash"
+      : v.mode;
+    const abono = automatic
+      ? Math.min(
+          Math.max(0, v.cashReceived! - v.expectedTotalCop!),
+          v.expectedBalanceCop || 0,
+        )
+      : v.abonoCop;
+    if (
+      (mode !== "cash" && !v.clientId) ||
+      (mode === "cash_and_payment" && !abono) ||
+      (!automatic && mode !== "cash_and_payment" && abono !== 0) ||
+      (mode !== "credit" && v.cashReceived === undefined)
+    )
+      return res
+        .status(400)
+        .json({
+          code: "VALIDATION_ERROR",
+          message: "Selecciona una cuenta para registrar saldo a crédito",
+        });
     let client;
     if (v.clientId) {
       client = (
@@ -229,10 +272,12 @@ class ApiController {
         )
       ).rows[0];
       if (!client)
-        return res.status(409).json({
-          code: "CLIENT_UNAVAILABLE",
-          message: "Selecciona una cuenta registrada y activa",
-        });
+        return res
+          .status(409)
+          .json({
+            code: "CLIENT_UNAVAILABLE",
+            message: "Selecciona una cuenta registrada y activa",
+          });
     }
     const r = await this.store.create(
       req.actor,
@@ -243,12 +288,18 @@ class ApiController {
         ...(client ? { client: { name: client.name } } : {}),
       },
       true,
-      v.mode === "credit" ? undefined : v.cashReceived,
-      v.mode === "credit" ? v.clientId : undefined,
-      v.mode === "cash_and_payment"
-        ? { clientId: v.clientId!, amountCop: v.abonoCop }
+      mode === "credit" && !automatic ? undefined : v.cashReceived,
+      mode === "credit" ? v.clientId : undefined,
+      mode === "cash_and_payment"
+        ? { clientId: v.clientId!, amountCop: abono }
         : undefined,
       v.clientId,
+      automatic
+        ? {
+            expectedTotalCop: v.expectedTotalCop!,
+            expectedBalanceCop: v.expectedBalanceCop || 0,
+          }
+        : undefined,
     );
     res.setHeader("Idempotency-Replayed", String(!!r.replayed));
     return res.status(r.status).json(r.body);

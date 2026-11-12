@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { auth } from "./session.js";
 import { Button, Input, Select } from "./material.js";
-import { Modal, money } from "./ui.js";
+import { Modal, money, roles } from "./ui.js";
 import type { OrderDraft } from "@playita/shared";
 type Pending = { path: string; body: string; key: string };
 const storageKey = (owner: string) => "playita-credit-attempt:" + owner;
@@ -37,7 +37,12 @@ export async function creditMutation(
     owner,
   );
   const result = await response.json();
-  if (response.ok || (response.status >= 400 && response.status < 500))
+  if (
+    response.ok ||
+    response.status === 400 ||
+    response.status === 422 ||
+    (response.status === 409 && result.code !== "IDEMPOTENCY_MISMATCH")
+  )
     localStorage.removeItem(storageKey(owner));
   if (!response.ok)
     throw Error(
@@ -80,22 +85,26 @@ export function Checkout({
     }),
     [clients, setClients] = useState<any[]>([]),
     [busy, setBusy] = useState(false),
+    [loading, setLoading] = useState(false),
     [error, setError] = useState(""),
     [attempt, setAttempt] = useState<Pending | null>(null);
   const current = draft || localDraft,
-    { clientId, mode, received } = current,
+    { clientId, received } = current,
     update = onDraftChange || setLocalDraft;
-  const setClientId = (clientId: string) => update({ ...current, clientId }),
-    setMode = (mode: string) => update({ ...current, mode }),
-    setReceived = (received: string) => update({ ...current, received });
+  async function loadClients() {
+    setLoading(true);
+    try {
+      const list = await get(owner, "/credit/clients");
+      setClients(Array.isArray(list) ? list : []);
+      setError("");
+    } catch {
+      setError("No se pudieron consultar cuentas. Pulsa Actualizar cuentas.");
+    } finally {
+      setLoading(false);
+    }
+  }
   useEffect(() => {
-    void get(owner, "/credit/clients")
-      .then(setClients)
-      .catch(() =>
-        setError(
-          "No se pudieron consultar clientes; puedes registrar pago completo sin cliente.",
-        ),
-      );
+    void loadClients();
     try {
       setAttempt(pending(owner));
     } catch (e: any) {
@@ -105,9 +114,11 @@ export function Checkout({
   const client = clients.find((c) => c.id === clientId),
     balance = client?.balanceCop || 0,
     cash = Number(received),
-    extra = Math.max(0, cash - total),
-    abono = mode === "cash_and_payment" ? Math.min(extra, balance) : 0,
-    change = mode === "credit" ? 0 : Math.max(0, cash - total - abono);
+    newCredit = Math.max(0, total - cash),
+    abono = Math.min(Math.max(0, cash - total), balance),
+    change = Math.max(0, cash - total - abono),
+    paidNow = Math.min(Math.max(0, cash), total),
+    futureBalance = balance + newCredit - abono;
   async function submit(retry = false) {
     setBusy(true);
     onBusy(true);
@@ -118,10 +129,11 @@ export function Checkout({
           ? JSON.parse(attempt.body)
           : {
               lines,
-              mode,
+              mode: "auto",
               ...(clientId ? { clientId } : {}),
-              ...(mode !== "credit" ? { cashReceived: cash } : {}),
-              abonoCop: abono,
+              cashReceived: cash,
+              expectedTotalCop: total,
+              expectedBalanceCop: balance,
             };
       await creditMutation(owner, "/credit/checkout", payload);
       onSaved();
@@ -135,112 +147,114 @@ export function Checkout({
   }
   return (
     <section className="checkout">
-      <div className="checkout-modes" role="group" aria-label="Tipo de cobro">
-        {[
-          ["cash", "Pago completo"],
-          ["credit", "A crédito"],
-          ["cash_and_payment", "Pago + abono"],
-        ].map(([id, label]) => (
-          <Button
-            key={id}
-            type="button"
-            aria-pressed={mode === id}
-            disabled={busy || !!attempt}
-            onClick={() => setMode(id!)}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
       <label>
-        Cliente {mode === "cash" ? "(opcional)" : "registrado"}
+        Cliente (obligatorio si queda saldo pendiente)
         <Select
           value={clientId}
-          disabled={busy || !!attempt}
-          onChange={(e) => setClientId(e.target.value)}
+          disabled={busy || !!attempt || loading}
+          onChange={(e) => update({ ...current, clientId: e.target.value })}
         >
-          <option value="">
-            {mode === "cash" ? "Cliente general" : "Selecciona una cuenta"}
-          </option>
+          <option value="">Cliente general</option>
           {clients
-            .filter((c) => c.active && (mode !== "credit" || c.creditEnabled))
+            .filter(
+              (c) =>
+                c.active &&
+                (received === "" || newCredit === 0 || c.creditEnabled),
+            )
             .map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
+                {c.role ? " · " + roles[c.role as keyof typeof roles] : ""}
               </option>
             ))}
         </Select>
       </label>
+      <Button
+        type="button"
+        disabled={busy || loading || !!attempt}
+        onClick={() => void loadClients()}
+      >
+        {loading ? "Cargando cuentas…" : "Actualizar cuentas"}
+      </Button>
+      <label>
+        Efectivo recibido (COP)
+        <Input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={2000000000}
+          step={1}
+          value={received}
+          disabled={busy || !!attempt}
+          placeholder="0 para dejar todo a crédito"
+          onChange={(e) => update({ ...current, received: e.target.value })}
+        />
+      </label>
       {client && (
         <p>
-          Deuda anterior: <strong>{money(balance)}</strong>
+          Crédito:{" "}
+          <strong>
+            {client.creditEnabled ? "Habilitado" : "No habilitado"}
+          </strong>
         </p>
       )}
-      {mode !== "credit" && (
-        <label>
-          Efectivo recibido (COP)
-          <Input
-            type="number"
-            inputMode="numeric"
-            min={total}
-            max={2000000000}
-            step={1}
-            value={received}
-            disabled={busy || !!attempt}
-            onChange={(e) => setReceived(e.target.value)}
-          />
-        </label>
-      )}
+      {newCredit > 0 &&
+        received !== "" &&
+        !clients.some((c) => c.active && c.creditEnabled) && (
+          <p>
+            No hay cuentas con crédito habilitado. El administrador puede
+            activarlo en Ajustes → Clientes → Editar cliente.
+          </p>
+        )}
       <div className="checkout-summary" aria-live="polite">
+        {client && (
+          <p>
+            Deuda actual: <strong>{money(balance)}</strong>
+          </p>
+        )}
         <p>
           Productos de esta canasta: <strong>{money(total)}</strong>
         </p>
-        {mode === "credit" ? (
+        <p>
+          Pago de esta compra: <strong>{money(paidNow)}</strong>
+        </p>
+        <p>
+          Nuevo crédito: <strong>{money(newCredit)}</strong>
+        </p>
+        <p>
+          Abono a deuda anterior: <strong>{money(abono)}</strong>
+        </p>
+        <p>
+          Cambio: <strong>{money(change)}</strong>
+        </p>
+        {client && (
           <p>
-            Se suma a la deuda: <strong>{money(total)}</strong> · Nuevo saldo{" "}
-            {money(balance + total)}
+            Saldo después de confirmar: <strong>{money(futureBalance)}</strong>
           </p>
-        ) : (
-          <>
-            <p>
-              Abono a deuda anterior: <strong>{money(abono)}</strong>
-            </p>
-            <p>
-              Cambio: <strong>{money(change)}</strong>
-            </p>
-            {mode === "cash_and_payment" && (
-              <p>Saldo restante: {money(balance - abono)}</p>
-            )}
-          </>
         )}
       </div>
-      {mode === "cash_and_payment" && (!client || !balance) && (
+      {client && balance > 0 && (
         <p>
-          Selecciona un cliente con deuda pendiente. El excedente del pago se
-          abonará a sus pedidos más antiguos.
+          El excedente se abona a la deuda anterior; después de saldarla, el
+          resto es cambio.
         </p>
       )}
-      {mode === "credit" && client && !client.creditEnabled && (
+      {newCredit > 0 && (
         <p>
-          Este cliente no tiene crédito habilitado. Debe autorizarlo un
-          administrador.
-        </p>
-      )}
-      {mode === "credit" && (
-        <p>
-          Confirma después de entregar los productos. No registra efectivo
-          recibido.
+          Para anotar saldo pendiente selecciona una cuenta activa con crédito
+          habilitado. Confirma después de entregar los productos.
         </p>
       )}
       <p role="alert">{error}</p>
       {attempt ? (
         <>
           <p>
-            Hay una operación por confirmar; no registres el cobro otra vez.
+            Hay una operación por confirmar. No registres el cobro otra vez.
           </p>
           {attempt.path === "/credit/checkout" ? (
             <Button
               className="primary"
+              type="button"
               disabled={busy}
               onClick={() => void submit(true)}
             >
@@ -257,19 +271,18 @@ export function Checkout({
           disabled={
             busy ||
             !lines.length ||
-            (mode !== "cash" && !clientId) ||
-            (mode === "credit" && !client?.creditEnabled) ||
-            (mode !== "credit" &&
-              (!Number.isSafeInteger(cash) || cash < total)) ||
-            (mode === "cash_and_payment" && abono <= 0)
+            received.trim() === "" ||
+            !Number.isSafeInteger(cash) ||
+            cash < 0 ||
+            (newCredit > 0 && (!client?.active || !client?.creditEnabled))
           }
           onClick={() => void submit()}
         >
           {busy
             ? "Registrando…"
-            : mode === "credit"
-              ? "Anotar a crédito"
-              : mode === "cash_and_payment"
+            : newCredit > 0
+              ? "Anotar a crédito " + money(newCredit)
+              : abono > 0
                 ? "Cobrar y abonar " + money(abono)
                 : "Confirmar pago"}
         </Button>
@@ -285,6 +298,8 @@ export function Credits({
   onChange: (saleRecovered?: boolean) => Promise<void>;
 }) {
   const [clients, setClients] = useState<any[]>([]),
+    [search, setSearch] = useState(""),
+    [filter, setFilter] = useState("enabled"),
     [detail, setDetail] = useState<any>(null),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false),
@@ -315,6 +330,18 @@ export function Credits({
       setAttempt(pending(owner));
     }
   }
+  const normalize = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase();
+  const visibleClients = clients.filter(
+    (c) =>
+      (filter === "enabled" ? c.creditEnabled : c.balanceCop > 0) &&
+      normalize(c.name + " " + (c.contact || "")).includes(
+        normalize(search.trim()),
+      ),
+  );
   return (
     <section className="credit-module">
       <h1>Créditos</h1>
@@ -350,11 +377,28 @@ export function Credits({
       >
         Actualizar saldos
       </Button>
+      <div className="form-grid">
+        <label>
+          Buscar cuenta
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Nombre o correo"
+          />
+        </label>
+        <label>
+          Mostrar
+          <Select value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="enabled">Crédito habilitado</option>
+            <option value="pending">Saldos pendientes</option>
+          </Select>
+        </label>
+      </div>
       <p className="price">
-        Por cobrar: {money(clients.reduce((n, c) => n + c.balanceCop, 0))}
+        Por cobrar total: {money(clients.reduce((n, c) => n + c.balanceCop, 0))}
       </p>
       <div className="cards">
-        {clients.map((c) => (
+        {visibleClients.map((c) => (
           <article className="panel" key={c.id}>
             <h2>{c.name}</h2>
             <small>
@@ -379,7 +423,9 @@ export function Credits({
           </article>
         ))}
       </div>
-      {!clients.length && <p>No hay clientes de crédito registrados.</p>}
+      {!visibleClients.length && (
+        <p>No hay cuentas que coincidan con este filtro.</p>
+      )}
       {detail && !payment && (
         <Modal title={"Crédito · " + detail.name} close={() => setDetail(null)}>
           <p className="price">Debe: {money(detail.balanceCop)}</p>

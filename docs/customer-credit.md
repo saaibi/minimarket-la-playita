@@ -1,17 +1,35 @@
-# Crédito de clientes
+# Crédito, cobros y perfil
 
-Administrador y vendedor pueden anotar ventas y abonos. El deudor debe ser una cuenta creada, activa y con credit_enabled=true en app_users; se rechazan invitados y contactos manuales de clients. El permiso de crédito está desactivado por defecto. Solo el administrador lo habilita al crear/editar la cuenta en Cuentas o al editar el cliente en Ajustes. Deshabilitarlo impide crédito nuevo, pero permite abonar deuda anterior. Las cuentas desactivadas conservan sus saldos consultables y pueden recibir abonos, pero no créditos nuevos. No se asignan roles ni se crean cuentas desde Caja.
+Las cuentas compradoras, vendedoras y administradoras pueden recibir crédito. Deben estar creadas, activas y tener credit_enabled=true; no se permiten invitados ni contactos manuales. El permiso está desactivado por defecto y solo el administrador lo modifica en Cuentas o al editar el cliente en Ajustes. Deshabilitarlo impide crédito nuevo, sin borrar deuda ni impedir abonos anteriores.
 
-Canasta: Pago completo (cliente opcional), A crédito (cliente obligatorio) o Pago + abono. El excedente de efectivo tras cubrir la canasta abona la deuda anterior hasta saldarla; el resto es cambio. El servidor valida importe, saldo, stock y precios; guarda venta y abonos en la misma transacción. Si algo falla, no guarda ninguno. Abonos repartidos a pedidos más antiguos primero. No se cobran intereses ni se ejecutan pagos externos.
+## Canasta única del personal
 
-Créditos muestra totales por cliente, cada pedido con productos/precios históricos y abonos por fecha. Abono individual con importe positivo y sin superar saldo. La fila de pedido se bloquea antes de calcular el saldo para evitar sobreabonos simultáneos. La venta a crédito descuenta stock una vez; los abonos no alteran inventario. Los créditos no pueden retirarse como registros de prueba.
+La misma canasta funciona en todos los módulos del personal y conserva cliente y efectivo al cerrar/reabrir. El ícono superior aparece también en Caja; se elimina solo el botón extra del listado. El banner verde permanece fijo. Los compradores conservan su flujo de pedido.
 
-Migraciones aditivas 007_customer_credit.sql y 008_credit_authorization.sql y 009_order_customer_link.sql. Nuevas rutas y cuerpos en openapi.json. Cada escritura usa Idempotency-Key; el intento y su cuerpo se guardan localmente por usuario antes del envío. Una respuesta perdida conserva esa clave. Créditos permite reintentar operaciones pendientes; no se deben registrar ni recibir cobros otra vez. Un error de validación confirmado permite corregir; un resultado desconocido conserva el intento. Solo conexión activa, sin confirmación offline. No se guardan tokens de sesión en ese registro local.
+Hay un único campo Efectivo recibido. Sean T los productos, D la deuda anterior y C el efectivo:
 
-Pruebas PostgreSQL: permisos, cuentas registradas/activas frente a invitado/contacto, idempotencia de ventas y abonos, saldo, abonos concurrentes, stock inalterado por pagos, cobro combinado y rollback íntegro si cambia deuda. Pruebas DOM: selección del modo, reparto de efectivo en venta/abono/cambio y una solicitud; reintento con clave/cuerpo conservados y aislamiento por usuario.
+- Pago de la compra = min(C,T).
+- Nuevo crédito = max(T-C,0), con permiso obligatorio para dejar cualquier saldo nuevo.
+- Abono anterior = min(max(C-T,0),D), aplicado a pedidos antiguos primero.
+- Cambio = max(C-T-D,0).
+- Saldo final = D + nuevo crédito - abono anterior.
 
-Compradores: Mi cuenta muestra su propio permiso de crédito, saldo pendiente, pedidos con líneas históricas y abonos. GET /credit/me toma el ID exclusivamente de la sesión; no admite seleccionar otro cliente. Mis pedidos incluye compras a crédito anotadas por el personal a nombre de esa cuenta. Otro comprador, incluso registrado, no puede consultar el pedido ni el saldo ajeno. Invitados ven la invitación a entrar con Google. No pueden registrar créditos ni abonos desde su perfil.
+C=0 deja toda la compra a crédito; un pago parcial crea crédito solo por el resto y deja el pago inicial anotado. El resumen muestra permiso, deuda actual, productos, pago de compra, nuevo crédito, abono, cambio y saldo posterior antes de confirmar. Si hay deuda, se explica que el excedente abona esa deuda antes de devolver cambio. Sin cliente registrado solo se admite pago completo.
 
-Las compras pagadas desde Caja con una cuenta seleccionada guardan customer_id, para que su comprador vea productos y recibo en su propio historial. No se vinculan ventas antiguas por coincidencia de nombre/correo escrito; la migración solo enlaza créditos que ya tienen cuenta explícita.
+El servidor verifica total, precio, stock, permiso y saldo con bloqueo. Venta, pago inicial y abonos se guardan en una sola transacción; cualquier conflicto revierte todo. El efectivo se registra manualmente después de recibirlo; no se ejecutan pagos externos ni se cobran intereses. Los abonos no modifican inventario. Los créditos no pueden retirarse como ventas de prueba.
 
-La canasta del personal es única en todos los módulos, con cliente, modo y efectivo conservados al cerrar/reabrir. El ícono superior permanece también en Caja; solo se retira el botón extra del listado, y el banner verde queda fijo. Los compradores conservan el flujo de pedido propio. Reintentos POS previos admiten los hashes equivalentes de versiones anteriores para no duplicar ventas al actualizar.
+## Consulta
+
+Créditos muestra por defecto cuentas habilitadas y permite buscar por nombre/correo. La vista Saldos pendientes permite cobrar deudas de cuentas deshabilitadas. El total por cobrar incluye todas las deudas. Cada pedido conserva productos, cantidades y precios históricos; cada abono conserva importe y fecha.
+
+Mi cuenta del comprador muestra su propio permiso, saldo, compras a crédito y abonos, además de otros pedidos. Las compras pagadas desde Caja con cuenta seleccionada también aparecen. La identidad de GET /credit/me procede exclusivamente de la sesión; no se acepta seleccionar otro cliente. Otros compradores no pueden leer el pedido ni el saldo ajeno. Invitados deben entrar con cuenta. El perfil no permite habilitar crédito ni registrar abonos.
+
+## Persistencia y validación
+
+Migraciones aditivas 007_customer_credit.sql, 008_credit_authorization.sql y 009_order_customer_link.sql. La última solo enlaza créditos que ya tenían cuenta explícita; no vincula ventas antiguas por coincidencias de nombre.
+
+Escrituras con Idempotency-Key. El cuerpo y la clave se guardan localmente por usuario antes del envío. Resultados desconocidos y errores de autenticación conservan el intento; Créditos permite reintentarlo sin cobrar nuevamente. Conflictos de validación confirmados permiten corregir. Compatibilidad de hashes de POS anteriores para reintentar ventas pendientes al actualizar. No se guardan tokens en ese registro y no se confirma offline.
+
+Pruebas: elegibilidad de los tres roles; permiso admin; rechazo de invitado/contacto/inactivo/no habilitado; crédito completo, parcial, pago exacto, abono y cambio; abonos concurrentes; snapshot de productos; aislamiento entre compradores; compras pagadas en historial propio; rollback íntegro por saldo/total/stock; reintentos y versiones previas; canasta igual entre módulos; filtros sin escrituras. Las pruebas PostgreSQL se ejecutan en CI con datos aislados, sin registrar operaciones financieras ficticias en producción.
+
+El endpoint conserva los modos antiguos por compatibilidad con intentos pendientes; la interfaz nueva utiliza mode=auto, cashReceived, expectedTotalCop y expectedBalanceCop. Un cambio del saldo o total respecto al resumen obliga a actualizar y revisar antes de confirmar.

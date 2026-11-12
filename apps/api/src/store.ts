@@ -177,6 +177,7 @@ export class Store {
     creditClientId?: string,
     settlement?: { clientId: string; amountCop: number },
     customerId?: string,
+    checkout?: { expectedTotalCop: number; expectedBalanceCop: number },
   ) {
     return this.once(
       actor,
@@ -185,7 +186,7 @@ export class Store {
         operation: sale ? "create-sale" : "create-order",
         draft,
         ...(sale
-          ? { cashReceived, creditClientId, settlement, customerId }
+          ? { cashReceived, creditClientId, settlement, customerId, checkout }
           : {}),
       },
       async (db, events) => {
@@ -213,6 +214,31 @@ export class Store {
             throw new Conflict(
               "CLIENT_UNAVAILABLE",
               "Selecciona un cliente registrado",
+            );
+        }
+        if (checkout && creditClient) {
+          const debts = (
+            await db.query(
+              "SELECT o.id,o.total_cop FROM orders o JOIN credit_sales s ON s.order_id=o.id WHERE s.client_id=$1 ORDER BY o.created_at,o.id FOR UPDATE OF o",
+              [creditClient.id],
+            )
+          ).rows;
+          let debt = 0;
+          for (const order of debts) {
+            const paid = Number(
+              (
+                await db.query(
+                  "SELECT COALESCE(SUM(amount_cop),0) AS paid FROM credit_payments WHERE order_id=$1",
+                  [order.id],
+                )
+              ).rows[0].paid,
+            );
+            debt += order.total_cop - paid;
+          }
+          if (debt !== checkout.expectedBalanceCop)
+            throw new Conflict(
+              "CREDIT_BALANCE_CHANGED",
+              "El saldo cambió. Actualiza la cuenta antes de confirmar",
             );
         }
         const ids = [...new Set(draft.lines.map((l) => l.productId))].sort(),
@@ -287,6 +313,20 @@ export class Store {
               { productId: id, needed, available: p.stock - p.reserved },
             );
         }
+        if (checkout && total !== checkout.expectedTotalCop)
+          throw new Conflict(
+            "TOTAL_CHANGED",
+            "El total cambió. Revisa la canasta antes de confirmar",
+          );
+        if (
+          creditClientId &&
+          cashReceived !== undefined &&
+          cashReceived >= total
+        )
+          throw new Conflict(
+            "CREDIT_PAYMENT_INVALID",
+            "El pago inicial debe ser menor que el total del crédito",
+          );
         if (
           sale &&
           !creditClientId &&
@@ -314,9 +354,11 @@ export class Store {
             draft.client?.reference || "",
             total,
             sale ? "pos" : "pickup",
-            sale && !creditClientId ? cashReceived : null,
-            sale && !creditClientId
-              ? cashReceived! - total - (settlement?.amountCop || 0)
+            sale ? (cashReceived ?? 0) : null,
+            sale
+              ? creditClientId
+                ? 0
+                : cashReceived! - total - (settlement?.amountCop || 0)
               : null,
             creditClientId || settlement?.clientId || customerId || null,
           ],
@@ -331,6 +373,21 @@ export class Store {
             "INSERT INTO credit_sales(order_id,client_id) VALUES($1,$2)",
             [id, creditClientId],
           );
+          if ((cashReceived || 0) > 0) {
+            await db.query(
+              "INSERT INTO credit_payments(id,order_id,amount_cop,actor_id) VALUES($1,$2,$3,$4)",
+              [randomUUID(), id, cashReceived, actor.id],
+            );
+            await this.audit(
+              db,
+              actor,
+              "credit.payment",
+              id,
+              { balanceCop: total },
+              { amountCop: cashReceived, balanceCop: total - cashReceived! },
+              "Pago inicial recibido con compra a crédito",
+            );
+          }
           await this.audit(
             db,
             actor,
@@ -440,8 +497,16 @@ export class Store {
         });
         return (await this.get(actor, id, db))!;
       },
-      sale
+      sale && !checkout
         ? [
+            {
+              operation: "create-sale",
+              draft,
+              cashReceived,
+              creditClientId,
+              settlement,
+              customerId,
+            },
             {
               operation: "create-sale",
               draft,
@@ -459,7 +524,7 @@ export class Store {
   async creditClients() {
     return (
       await this.pool
-        .query(`SELECT c.id,COALESCE(c.email,c.phone) AS name,'' AS contact,c.active,c.credit_enabled AS \"creditEnabled\",
+        .query(`SELECT c.id,COALESCE(c.email,c.phone) AS name,'' AS contact,c.role,c.active,c.credit_enabled AS \"creditEnabled\",
       COALESCE((SELECT SUM(o.total_cop) FROM credit_sales s JOIN orders o ON o.id=s.order_id WHERE s.client_id=c.id),0)::bigint AS "chargedCop",
       COALESCE((SELECT SUM(p.amount_cop) FROM credit_payments p JOIN credit_sales s ON s.order_id=p.order_id WHERE s.client_id=c.id),0)::bigint AS "paidCop"
       FROM app_users c WHERE NOT c.is_guest ORDER BY c.created_at`)
