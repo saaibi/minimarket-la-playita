@@ -525,7 +525,7 @@ export function BuyerProfile({
     );
   }
   return (
-    <section>
+    <section className="buyer-profile">
       <h1>Mi cuenta</h1>
       <Button type="button" onClick={() => void load()}>
         Actualizar mi información

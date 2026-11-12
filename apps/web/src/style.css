@@ -1243,3 +1243,8 @@ label .MuiInputBase-root {
 .checkout-summary p {
   margin: 4px 0;
 }
+
+.buyer-profile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
