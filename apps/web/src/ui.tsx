@@ -1,3 +1,4 @@
+import { Button } from "./material.js";
 import React, { useEffect, useRef } from "react";
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
@@ -80,7 +81,7 @@ export function Modal({
       >
         <div className="dialog-top">
           <h2>{title}</h2>
-          <button onClick={close}>× Cerrar</button>
+          <Button onClick={close}>× Cerrar</Button>
         </div>
         {children}
       </div>

@@ -1,3 +1,4 @@
+import { Button } from "./material.js";
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -6,6 +7,7 @@ import { Login, Protected } from "./login.js";
 import { StaffUsers } from "./staff.js";
 import { Shop } from "./shop.js";
 import "./style.css";
+import { AppAppearance } from "./material.js";
 function Root() {
   const [ready, setReady] = useState(false),
     [failed, setFailed] = useState(false),
@@ -60,10 +62,10 @@ function Root() {
             La conexión o el almacenamiento seguro no respondió a tiempo. Tus
             pedidos guardados no se han borrado.
           </p>
-          <button className="primary" onClick={() => setAttempt((n) => n + 1)}>
+          <Button className="primary" onClick={() => setAttempt((n) => n + 1)}>
             Reintentar conexión
-          </button>
-          <button onClick={() => setFailed(false)}>Ir al acceso</button>
+          </Button>
+          <Button onClick={() => setFailed(false)}>Ir al acceso</Button>
         </section>
       </main>
     );
@@ -98,4 +100,8 @@ function Root() {
     </BrowserRouter>
   );
 }
-createRoot(document.getElementById("root")!).render(<Root />);
+createRoot(document.getElementById("root")!).render(
+  <AppAppearance>
+    <Root />
+  </AppAppearance>,
+);

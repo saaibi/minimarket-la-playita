@@ -38,6 +38,11 @@ test("React DOM: acceso, invitado/social deshabilitado, rutas protegidas y alta 
         },
         accessExpiresAt: Date.now() + 300000,
       });
+    if (path.endsWith("/auth/users/assign-role"))
+      return Response.json(
+        { id: "new", role: requests.at(-1)!.body.role },
+        { status: 201 },
+      );
     if (path.endsWith("/auth/users"))
       return init?.method === "POST"
         ? Response.json(
@@ -111,31 +116,27 @@ test("React DOM: acceso, invitado/social deshabilitado, rutas protegidas y alta 
       </MemoryRouter>,
     );
     await waitFor(() =>
-      assert.ok(view.getByRole("button", { name: "Crear cuenta" })),
+      assert.ok(view.getByRole("button", { name: "Guardar rol" })),
     );
     fireEvent.change(view.getByLabelText("Correo"), {
       target: { value: "staff@example.invalid" },
-    });
-    fireEvent.change(view.getByLabelText(/Contraseña inicial/), {
-      target: { value: "only-ui-test-password" },
     });
     fireEvent.change(view.getByLabelText("Rol"), {
       target: { value: "seller" },
     });
     fireEvent.submit(
-      view.getByRole("button", { name: "Crear cuenta" }).closest("form")!,
+      view.getByRole("button", { name: "Guardar rol" }).closest("form")!,
     );
     await waitFor(() =>
       assert.ok(
         requests.some(
-          (r) => r.path.endsWith("/auth/users") && r.body?.role === "seller",
+          (r) =>
+            r.path.endsWith("/auth/users/assign-role") &&
+            r.body?.role === "seller",
         ),
       ),
     );
-    assert.equal(
-      (view.getByLabelText(/Contraseña inicial/) as HTMLInputElement).value,
-      "",
-    );
+    assert.equal(view.queryByLabelText(/Contraseña inicial/), null);
     cleanup();
     await act(async () => {
       await auth.logout();

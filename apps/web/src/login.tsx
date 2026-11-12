@@ -1,3 +1,4 @@
+import { Button, Input } from "./material.js";
 import React from "react";
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
@@ -39,9 +40,9 @@ export function Login() {
       </section>
       <section className="panel">
         <h2>Comprar</h2>
-        <button disabled={busy} onClick={() => void act(() => auth.guest())}>
+        <Button disabled={busy} onClick={() => void act(() => auth.guest())}>
           Continuar como invitado
-        </button>
+        </Button>
         <small>
           La primera entrada requiere conexión. La sesión invitada pertenece a
           este navegador o app; no permite recuperar pedidos desde otro
@@ -63,7 +64,7 @@ export function Login() {
         >
           <label>
             Correo
-            <input
+            <Input
               type="email"
               autoComplete="username"
               value={email}
@@ -74,7 +75,7 @@ export function Login() {
           </label>
           <label>
             Contraseña
-            <input
+            <Input
               type="password"
               autoComplete="current-password"
               value={password}
@@ -83,7 +84,7 @@ export function Login() {
               maxLength={128}
             />
           </label>
-          <button disabled={busy}>{busy ? "Conectando…" : "Ingresar"}</button>
+          <Button disabled={busy}>{busy ? "Conectando…" : "Ingresar"}</Button>
           {busy && (
             <p role="status">
               La primera conexión puede tardar alrededor de un minuto mientras

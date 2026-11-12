@@ -75,9 +75,14 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
       ]);
     if (path.endsWith("/settings")) return Response.json(settings);
     if (
-      ["/orders", "/notifications", "/clients", "/audit", "/auth/users"].some(
-        (p) => path.endsWith(p),
-      )
+      [
+        "/orders",
+        "/notifications",
+        "/clients",
+        "/audit",
+        "/auth/users",
+        "/auth/customers",
+      ].some((p) => path.endsWith(p))
     )
       return Response.json([]);
     return Response.json({ ok: true });
@@ -109,9 +114,7 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
         );
         fireEvent.click(view.getByRole("button", { name: "Ajustes" }));
         await waitFor(() =>
-          assert.ok(
-            view.getByRole("heading", { name: "Personal de la tienda" }),
-          ),
+          assert.ok(view.getByRole("heading", { name: "Cuentas y roles" })),
         );
         assert.ok(view.getByRole("heading", { name: "Clientes" }));
         assert.ok(view.getByRole("heading", { name: "Horario · Bogotá" }));

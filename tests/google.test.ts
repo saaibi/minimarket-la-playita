@@ -42,8 +42,31 @@ test("Google JWT: HTTP JWKS, firma, audiencia, emisor, nonce, vencimiento y corr
     assert.deepEqual(await verifier.verify(await token(), "nonce-test"), {
       subject: "test-subject",
       email: "buyer@example.invalid",
+      emailAuthoritative: false,
     });
     assert.ok(requests > 0);
+    assert.equal(
+      (
+        await verifier.verify(
+          await token({ email: "owner@gmail.com" }),
+          "nonce-test",
+        )
+      ).emailAuthoritative,
+      true,
+    );
+    assert.equal(
+      (
+        await verifier.verify(
+          await token({
+            email: "owner@example.invalid",
+            hd: "example.invalid",
+          }),
+          "nonce-test",
+        )
+      ).emailAuthoritative,
+      true,
+    );
+
     for (const overrides of [
       { nonce: "other" },
       { email_verified: false },

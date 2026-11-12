@@ -355,7 +355,8 @@ export class AuthService {
           );
           if (!consumed.rowCount)
             throw new AuthError(401, "GOOGLE_SIGNIN_FAILED");
-          // Serialize concurrent sign-ins for the same subject without linking by email.
+          // Bind by Google's stable subject. Initial email matching is restricted
+          // to Google-authoritative email ownership, never a client-provided role.
           await db.query(
             "SELECT pg_advisory_xact_lock(hashtextextended($1,77332005))",
             [identity.subject],
@@ -367,27 +368,39 @@ export class AuthService {
             )
           ).rows[0];
           if (!user) {
-            if (
-              (
-                await db.query("SELECT 1 FROM app_users WHERE email=$1", [
-                  identity.email,
-                ])
-              ).rowCount
-            )
-              throw new AuthError(409, "ACCOUNT_EXISTS_USE_EXISTING_LOGIN");
             user = (
               await db.query(
-                "INSERT INTO app_users(id,email,role) VALUES($1,$2,'buyer') RETURNING *",
-                [randomUUID(), identity.email],
+                "SELECT * FROM app_users WHERE email=$1 FOR UPDATE",
+                [identity.email],
               )
             ).rows[0];
+            if (user) {
+              if (!identity.emailAuthoritative)
+                throw new AuthError(409, "ACCOUNT_EXISTS_USE_EXISTING_LOGIN");
+              if (
+                (
+                  await db.query(
+                    "SELECT 1 FROM google_identities WHERE user_id=$1",
+                    [user.id],
+                  )
+                ).rowCount
+              )
+                throw new AuthError(409, "ACCOUNT_EXISTS_USE_EXISTING_LOGIN");
+            } else {
+              user = (
+                await db.query(
+                  "INSERT INTO app_users(id,email,role) VALUES($1,$2,'buyer') RETURNING *",
+                  [randomUUID(), identity.email],
+                )
+              ).rows[0];
+            }
+            if (!user.active) throw new AuthError(403, "GOOGLE_SIGNIN_FAILED");
             await db.query(
               "INSERT INTO google_identities(subject,user_id) VALUES($1,$2)",
               [identity.subject, user.id],
             );
           }
-          if (!user.active || user.role !== "buyer")
-            throw new AuthError(403, "GOOGLE_SIGNIN_FAILED");
+          if (!user.active) throw new AuthError(403, "GOOGLE_SIGNIN_FAILED");
           const result = await this.issue(db, user, mode);
           await db.query("COMMIT");
           return this.respond(res, mode, result);
@@ -594,6 +607,88 @@ export class AuthService {
           );
           await db.query("COMMIT");
           return this.respond(res, mode, result);
+        } catch (e) {
+          await db.query("ROLLBACK");
+          throw e;
+        } finally {
+          db.release();
+        }
+      }
+      if (req.method === "GET" && path === "/auth/customers") {
+        const s = await this.protect(req);
+        if (s.actor.role !== "admin") throw new AuthError(403, "FORBIDDEN");
+        return res.json(
+          (
+            await this.pool.query(
+              "SELECT id,email,phone,active,created_at AS \"createdAt\" FROM app_users WHERE role='buyer' AND NOT is_guest ORDER BY created_at",
+            )
+          ).rows,
+        );
+      }
+      if (req.method === "POST" && path === "/auth/users/assign-role") {
+        const s = await this.protect(req);
+        if (s.actor.role !== "admin") throw new AuthError(403, "FORBIDDEN");
+        const input = z
+          .object({ email, role: z.enum(["admin", "seller", "buyer"]) })
+          .strict()
+          .parse(body);
+        const db = await this.pool.connect();
+        try {
+          await db.query("BEGIN");
+          await db.query("SELECT pg_advisory_xact_lock(77332003)");
+          const existing = (
+            await db.query(
+              "SELECT * FROM app_users WHERE email=$1 FOR UPDATE",
+              [input.email],
+            )
+          ).rows[0];
+          if (existing?.role === "admin" && input.role !== "admin") {
+            if (existing.id === s.actor.id)
+              throw new AuthError(409, "CANNOT_CHANGE_SELF_ROLE");
+            if (
+              (
+                await db.query(
+                  "SELECT id FROM app_users WHERE role='admin' AND active",
+                )
+              ).rowCount! <= 1
+            )
+              throw new AuthError(409, "LAST_ADMIN");
+          }
+          if (existing && !existing.active)
+            throw new AuthError(409, "ACCOUNT_INACTIVE");
+          const user = existing
+            ? (
+                await db.query(
+                  "UPDATE app_users SET role=$2 WHERE id=$1 RETURNING id,email,role,active",
+                  [existing.id, input.role],
+                )
+              ).rows[0]
+            : (
+                await db.query(
+                  "INSERT INTO app_users(id,email,role) VALUES($1,$2,$3) RETURNING id,email,role,active",
+                  [randomUUID(), input.email, input.role],
+                )
+              ).rows[0];
+          if (existing && existing.role !== input.role) {
+            const families = (
+              await db.query(
+                "SELECT DISTINCT family_id FROM auth_sessions WHERE user_id=$1",
+                [existing.id],
+              )
+            ).rows;
+            for (const f of families) await this.revokeFamily(db, f.family_id);
+          }
+          await db.query(
+            "INSERT INTO inventory_audit(actor_id,kind,entity_id,before_data,after_data,reason) VALUES($1,'account.role',$2,$3,$4,'Asignación de rol por administrador')",
+            [
+              s.actor.id,
+              user.id,
+              existing ? JSON.stringify({ role: existing.role }) : null,
+              JSON.stringify({ role: user.role }),
+            ],
+          );
+          await db.query("COMMIT");
+          return res.status(existing ? 200 : 201).json(user);
         } catch (e) {
           await db.query("ROLLBACK");
           throw e;

@@ -2,6 +2,7 @@ import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from "jose";
 export interface GoogleIdentity {
   subject: string;
   email: string;
+  emailAuthoritative: boolean;
 }
 export interface GoogleVerifier {
   clientId: string;
@@ -42,6 +43,12 @@ export class GoogleIdVerifier implements GoogleVerifier {
       !payload.email.includes("@")
     )
       throw Error("Invalid Google identity");
-    return { subject: payload.sub, email: payload.email.toLowerCase() };
+    return {
+      subject: payload.sub,
+      email: payload.email.toLowerCase(),
+      emailAuthoritative:
+        payload.email.toLowerCase().endsWith("@gmail.com") ||
+        (typeof payload.hd === "string" && payload.hd.length > 0),
+    };
   }
 }

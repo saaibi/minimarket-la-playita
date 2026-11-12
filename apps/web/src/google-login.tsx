@@ -1,3 +1,4 @@
+import { Button } from "./material.js";
 import React, { useEffect, useRef, useState } from "react";
 import { registerPlugin, Capacitor } from "@capacitor/core";
 import { auth } from "./session.js";
@@ -55,7 +56,7 @@ function loadSdk(): Promise<GoogleSdk> {
 function googleError(error: unknown) {
   return error instanceof SessionError &&
     error.code === "ACCOUNT_EXISTS_USE_EXISTING_LOGIN"
-    ? "Ese correo ya tiene una cuenta. Usa su forma de acceso habitual; no vinculamos cuentas automáticamente."
+    ? "No se pudo vincular esa cuenta de Google. Usa tu acceso habitual o consulta al administrador."
     : "No fue posible entrar con Google. Puedes reintentar o continuar como invitado.";
 }
 export function GoogleLogin({
@@ -170,7 +171,7 @@ export function GoogleLogin({
         />
       )}
       {(native || !ready) && (
-        <button
+        <Button
           className="google-button"
           aria-label="Acceder con Google"
           title={
@@ -184,7 +185,7 @@ export function GoogleLogin({
           }
         >
           <img src="/assets/google-g.png" alt="" aria-hidden="true" />
-        </button>
+        </Button>
       )}
       {error && <p role="alert">{error}</p>}
     </>

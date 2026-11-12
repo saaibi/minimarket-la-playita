@@ -1,3 +1,6 @@
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import { Input, Select, Button } from "./material.js";
 import React from "react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -7,7 +10,6 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
   const session = useSession()!,
     [users, setUsers] = useState<Staff[]>([]),
     [email, setEmail] = useState(""),
-    [password, setPassword] = useState(""),
     [role, setRole] = useState("seller"),
     [message, setMessage] = useState("");
   async function load() {
@@ -23,29 +25,28 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
   return (
     <section className="staff-users">
       {!embedded && <Link to="/app">← Volver a tienda</Link>}
-      <h2>Personal de la tienda</h2>
-      <p>Solo administrador. No hay registro público de personal.</p>
+      <h2>Cuentas y roles</h2>
+      <p>
+        Asigna un correo y su rol. La persona ingresará con su cuenta de Google.
+      </p>
       <section className="panel">
-        <h2>Crear cuenta</h2>
+        <h2>Asignar rol</h2>
         <form
           onSubmit={(e) => {
             e.preventDefault();
             void (async () => {
               try {
-                const r = await auth.request("/auth/users", {
+                const r = await auth.request("/auth/users/assign-role", {
                   method: "POST",
-                  body: JSON.stringify({ email, password, role }),
+                  body: JSON.stringify({ email, role }),
                 });
                 if (!r.ok) throw Error();
-                setPassword("");
                 setEmail("");
-                setMessage(
-                  "Cuenta creada. Entrega su contraseña por un canal privado apropiado; no se registra en logs.",
-                );
+                setMessage("Rol guardado. Se aplicará al ingresar con Google.");
                 await load();
               } catch {
                 setMessage(
-                  "No fue posible crear la cuenta. Revisa datos y permisos.",
+                  "No fue posible guardar el rol. Revisa el correo y los permisos.",
                 );
               }
             })();
@@ -53,7 +54,7 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
         >
           <label>
             Correo
-            <input
+            <Input
               type="email"
               required
               maxLength={254}
@@ -62,60 +63,63 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
             />
           </label>
           <label>
-            Contraseña inicial (mínimo 12 caracteres)
-            <input
-              type="password"
-              minLength={12}
-              maxLength={128}
-              required
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-          <label>
             Rol
-            <select value={role} onChange={(e) => setRole(e.target.value)}>
+            <Select value={role} onChange={(e) => setRole(e.target.value)}>
               <option value="seller">Vendedor</option>
               <option value="admin">Administrador</option>
-            </select>
+              <option value="buyer">Comprador</option>
+            </Select>
           </label>
-          <button>Crear cuenta</button>
+          <Button>Guardar rol</Button>
         </form>
       </section>
       <section className="panel">
         <h2>Cuentas</h2>
-        {users.map((u) => (
-          <div className="row" key={u.id}>
-            <span>
-              {u.email}
-              <small>
-                {u.role} · {u.active ? "Activa" : "Desactivada"}
-              </small>
-            </span>
-            <button
-              disabled={!u.active || u.id === session.actor.id}
-              onClick={() => {
-                void (async () => {
-                  const r = await auth.request(`/auth/users/${u.id}/disable`, {
-                    method: "POST",
-                    body: "{}",
-                  });
-                  setMessage(
-                    r.ok
-                      ? "Cuenta desactivada y sesiones revocadas."
-                      : "No se pudo desactivar la cuenta.",
+        <List disablePadding>
+          {users.map((u) => (
+            <ListItem disableGutters className="row" key={u.id}>
+              <span>
+                {u.email}
+                <small>
+                  {u.role} · {u.active ? "Activa" : "Desactivada"}
+                </small>
+              </span>
+              <Button
+                type="button"
+                onClick={() => {
+                  setEmail(u.email);
+                  setRole(u.role);
+                }}
+              >
+                Cambiar rol
+              </Button>
+              <Button
+                disabled={!u.active || u.id === session.actor.id}
+                onClick={() => {
+                  void (async () => {
+                    const r = await auth.request(
+                      `/auth/users/${u.id}/disable`,
+                      {
+                        method: "POST",
+                        body: "{}",
+                      },
+                    );
+                    setMessage(
+                      r.ok
+                        ? "Cuenta desactivada y sesiones revocadas."
+                        : "No se pudo desactivar la cuenta.",
+                    );
+                    await load();
+                  })().catch(() =>
+                    setMessage("No se pudo actualizar la cuenta."),
                   );
-                  await load();
-                })().catch(() =>
-                  setMessage("No se pudo actualizar la cuenta."),
-                );
-              }}
-            >
-              Desactivar
-            </button>
-          </div>
-        ))}
+                }}
+              >
+                Desactivar
+              </Button>
+            </ListItem>
+          ))}
+        </List>
       </section>
       <p role="status">{message}</p>
     </section>

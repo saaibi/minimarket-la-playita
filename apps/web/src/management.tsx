@@ -1,3 +1,5 @@
+import { TextSizeSettings } from "./material.js";
+import { Button, Input, Select, Textarea } from "./material.js";
 import React, { useEffect, useState } from "react";
 import {
   type Product,
@@ -77,16 +79,16 @@ export function Inventory({
           </p>
         </div>
         {admin && (
-          <button className="primary" onClick={() => setEdit(null)}>
+          <Button className="primary" onClick={() => setEdit(null)}>
             + Nuevo producto
-          </button>
+          </Button>
         )}
       </div>
       <div className="stats">
-        <button className="stat" onClick={() => setFilter("all")}>
+        <Button className="stat" onClick={() => setFilter("all")}>
           Productos<b>{products.length}</b>
-        </button>
-        <button className="stat" onClick={() => setFilter("low")}>
+        </Button>
+        <Button className="stat" onClick={() => setFilter("low")}>
           Por reponer
           <b>
             {
@@ -95,25 +97,25 @@ export function Inventory({
               ).length
             }
           </b>
-        </button>
-        <button className="stat" onClick={() => setFilter("out")}>
+        </Button>
+        <Button className="stat" onClick={() => setFilter("out")}>
           Agotados<b>{products.filter((p) => p.available <= 0).length}</b>
-        </button>
-        <button className="stat" onClick={() => onNavigate("orders")}>
+        </Button>
+        <Button className="stat" onClick={() => onNavigate("orders")}>
           Pedidos por entregar<b>{ordersCount}</b>
-        </button>
-        <button className="stat" onClick={() => onNavigate("history")}>
+        </Button>
+        <Button className="stat" onClick={() => onNavigate("history")}>
           Ventas registradas<b>{money(salesTotal)}</b>
-        </button>
+        </Button>
       </div>
       <div className="toolbar">
-        <input
+        <Input
           aria-label="Buscar inventario"
           placeholder="Buscar producto…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select
+        <Select
           aria-label="Categoría"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
@@ -124,8 +126,8 @@ export function Inventory({
               <option key={c}>{c}</option>
             ),
           )}
-        </select>
-        <select
+        </Select>
+        <Select
           aria-label="Filtrar inventario"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
@@ -133,7 +135,7 @@ export function Inventory({
           <option value="all">Todos</option>
           <option value="low">Por reponer</option>
           <option value="out">Agotados</option>
-        </select>
+        </Select>
       </div>
       <div className="table-wrap">
         <table>
@@ -189,29 +191,31 @@ export function Inventory({
                 {admin && (
                   <>
                     <td>{money(p.costCop || 0)}</td>
-                    <td>
-                      <button onClick={() => setEdit(p)}>Editar</button>
-                      <button
-                        onClick={() => {
-                          setAdjust(p);
-                          setDelta("0");
-                          setChangePrice(false);
-                          setPrices(
-                            p.kind === "weight"
-                              ? { kilo: String(p.priceCop) }
-                              : Object.fromEntries(
-                                  p.presentations.map((v) => [
-                                    v.id,
-                                    String(v.priceCop),
-                                  ]),
-                                ),
-                          );
-                          setReason("");
-                          setError("");
-                        }}
-                      >
-                        Ajustar
-                      </button>
+                    <td className="product-actions-cell">
+                      <div className="product-actions">
+                        <Button onClick={() => setEdit(p)}>Editar</Button>
+                        <Button
+                          onClick={() => {
+                            setAdjust(p);
+                            setDelta("0");
+                            setChangePrice(false);
+                            setPrices(
+                              p.kind === "weight"
+                                ? { kilo: String(p.priceCop) }
+                                : Object.fromEntries(
+                                    p.presentations.map((v) => [
+                                      v.id,
+                                      String(v.priceCop),
+                                    ]),
+                                  ),
+                            );
+                            setReason("");
+                            setError("");
+                          }}
+                        >
+                          Ajustar
+                        </Button>
+                      </div>
                     </td>
                   </>
                 )}
@@ -278,7 +282,7 @@ export function Inventory({
           >
             <label>
               Cambio (+ ingreso / − salida)
-              <input
+              <Input
                 type="number"
                 step="1"
                 value={delta}
@@ -287,7 +291,7 @@ export function Inventory({
               />
             </label>
             <label>
-              <input
+              <Input
                 type="checkbox"
                 checked={changePrice}
                 onChange={(e) => setChangePrice(e.target.checked)}
@@ -308,12 +312,13 @@ export function Inventory({
                 ).map((v) => (
                   <label key={v.id}>
                     {v.name} (COP)
-                    <input
+                    <Input
                       type="number"
                       min="0"
                       max="100000000"
                       step="1"
                       required
+                      clearZero
                       value={prices[v.id] ?? ""}
                       onChange={(e) =>
                         setPrices({ ...prices, [v.id]: e.target.value })
@@ -325,7 +330,7 @@ export function Inventory({
             )}
             <label>
               Motivo obligatorio
-              <input
+              <Input
                 value={reason}
                 minLength={3}
                 maxLength={200}
@@ -334,12 +339,12 @@ export function Inventory({
               />
             </label>
             <p role="alert">{error}</p>
-            <button className="primary" disabled={busy}>
+            <Button className="primary" disabled={busy}>
               Guardar ajuste
-            </button>
-            <button type="button" onClick={() => setAdjust(null)}>
+            </Button>
+            <Button type="button" onClick={() => setAdjust(null)}>
               Cancelar
-            </button>
+            </Button>
           </form>
         </Modal>
       )}
@@ -409,7 +414,20 @@ function ProductEditor({
     [priceUnit, setPriceUnit] = useState("kg"),
     [photoBusy, setPhotoBusy] = useState(false);
   const field = (key: keyof ProductWrite, v: any) =>
-    setValue((p) => ({ ...p, [key]: v }));
+    setValue((p) => {
+      const next = { ...p, [key]: v };
+      if (key === "priceCop" && next.kind === "unit")
+        next.presentations = next.presentations.map((presentation) =>
+          presentation.factor === 1
+            ? { ...presentation, priceCop: Number(v) }
+            : presentation,
+        );
+      if (key === "presentations" && next.kind === "unit")
+        next.priceCop =
+          next.presentations.find((presentation) => presentation.factor === 1)
+            ?.priceCop ?? next.priceCop;
+      return next;
+    });
   return (
     <Modal title={product ? "Editar producto" : "Nuevo producto"} close={close}>
       <form
@@ -424,7 +442,7 @@ function ProductEditor({
       >
         <label>
           Nombre
-          <input
+          <Input
             required
             maxLength={120}
             value={value.name}
@@ -434,7 +452,7 @@ function ProductEditor({
         <div className="form-grid">
           <label>
             Categoría
-            <input
+            <Input
               required
               maxLength={80}
               value={value.category}
@@ -443,7 +461,7 @@ function ProductEditor({
           </label>
           <label>
             Código
-            <input
+            <Input
               maxLength={80}
               value={value.code}
               onChange={(e) => field("code", e.target.value)}
@@ -451,7 +469,7 @@ function ProductEditor({
           </label>
           <label>
             Proveedor
-            <input
+            <Input
               maxLength={150}
               value={value.supplier}
               onChange={(e) => field("supplier", e.target.value)}
@@ -460,7 +478,7 @@ function ProductEditor({
         </div>
         <label>
           Tipo
-          <select
+          <Select
             disabled={!!product}
             value={value.kind}
             onChange={(e) =>
@@ -476,18 +494,18 @@ function ProductEditor({
           >
             <option value="unit">Por unidades / presentaciones</option>
             <option value="weight">Por peso (gramos)</option>
-          </select>
+          </Select>
         </label>
         {value.kind === "weight" && (
           <label>
             Unidad del precio y costo
-            <select
+            <Select
               value={priceUnit}
               onChange={(e) => setPriceUnit(e.target.value)}
             >
               <option value="kg">Kilo</option>
               <option value="lb">Libra</option>
-            </select>
+            </Select>
           </label>
         )}
         <div className="form-grid">
@@ -516,12 +534,13 @@ function ProductEditor({
                   } as any
                 )[key]
               }
-              <input
+              <Input
                 type="number"
                 required
                 min="0"
                 step="1"
                 max="100000000"
+                clearZero
                 value={
                   ((value as any)[key] || 0) /
                   (value.kind === "weight"
@@ -551,7 +570,7 @@ function ProductEditor({
         </div>
         <label>
           Descripción
-          <textarea
+          <Textarea
             value={value.description}
             maxLength={1000}
             onChange={(e) => field("description", e.target.value)}
@@ -563,7 +582,7 @@ function ProductEditor({
           onBusy={setPhotoBusy}
         />
         <label className="check">
-          <input
+          <Input
             type="checkbox"
             checked={value.visible}
             onChange={(e) => field("visible", e.target.checked)}
@@ -581,7 +600,7 @@ function ProductEditor({
               <div className="presentation-row" key={i}>
                 <label>
                   Nombre
-                  <input
+                  <Input
                     required
                     value={p.name}
                     onChange={(e) =>
@@ -596,7 +615,7 @@ function ProductEditor({
                 </label>
                 <label>
                   Unidades por presentación
-                  <input
+                  <Input
                     type="number"
                     min="1"
                     step="1"
@@ -616,11 +635,12 @@ function ProductEditor({
                 </label>
                 <label>
                   Precio COP
-                  <input
+                  <Input
                     type="number"
                     min="0"
                     step="1"
                     required
+                    clearZero
                     value={p.priceCop}
                     onChange={(e) =>
                       field(
@@ -634,7 +654,7 @@ function ProductEditor({
                     }
                   />
                 </label>
-                <button
+                <Button
                   type="button"
                   onClick={() =>
                     field(
@@ -644,10 +664,10 @@ function ProductEditor({
                   }
                 >
                   Quitar presentación
-                </button>
+                </Button>
               </div>
             ))}
-            <button
+            <Button
               type="button"
               onClick={() =>
                 field("presentations", [
@@ -657,16 +677,16 @@ function ProductEditor({
               }
             >
               + Presentación
-            </button>
+            </Button>
           </fieldset>
         )}
         <p role="alert">{error}</p>
-        <button className="primary" disabled={busy || photoBusy}>
+        <Button className="primary" disabled={busy || photoBusy}>
           Guardar producto
-        </button>
-        <button type="button" onClick={close}>
+        </Button>
+        <Button type="button" onClick={close}>
           Cancelar
-        </button>
+        </Button>
       </form>
     </Modal>
   );
@@ -696,6 +716,7 @@ export function Settings({
           <p>Horario de atención y personal autorizado.</p>
         </div>
       </div>
+      <TextSizeSettings />
       {draft ? (
         <section className="panel">
           <h2>Horario · Bogotá</h2>
@@ -724,7 +745,7 @@ export function Settings({
           >
             <label>
               Modo de atención
-              <select
+              <Select
                 value={draft.override}
                 onChange={(e) =>
                   setDraft({
@@ -737,9 +758,9 @@ export function Settings({
                 <option value="auto">Según horario</option>
                 <option value="open">Abrir manualmente</option>
                 <option value="closed">Cerrar manualmente</option>
-              </select>
+              </Select>
             </label>
-            <button
+            <Button
               type="button"
               onClick={() =>
                 setDraft({
@@ -749,7 +770,7 @@ export function Settings({
               }
             >
               Aplicar horario del lunes a todos los días
-            </button>
+            </Button>
             {[1, 2, 3, 4, 5, 6, 0].map((i) => {
               const d = draft.days[i]!;
               return (
@@ -768,7 +789,7 @@ export function Settings({
                     }
                   </strong>
                   <label className="check">
-                    <input
+                    <Input
                       type="checkbox"
                       checked={!d.closed}
                       onChange={(e) =>
@@ -784,7 +805,7 @@ export function Settings({
                   </label>
                   <label>
                     Apertura
-                    <input
+                    <Input
                       type="time"
                       disabled={d.closed}
                       required
@@ -801,7 +822,7 @@ export function Settings({
                   </label>
                   <label>
                     Cierre
-                    <input
+                    <Input
                       type="time"
                       disabled={d.closed}
                       required
@@ -819,16 +840,16 @@ export function Settings({
                 </div>
               );
             })}
-            <button className="primary" disabled={busy}>
+            <Button className="primary" disabled={busy}>
               Guardar horario
-            </button>
+            </Button>
             <p role="status">{message}</p>
           </form>
         </section>
       ) : (
         <section className="panel">
           <p>No fue posible consultar el horario.</p>
-          <button
+          <Button
             onClick={() =>
               void reload().catch(() =>
                 setMessage("La tienda no respondió. Reintenta en un momento."),
@@ -836,103 +857,71 @@ export function Settings({
             }
           >
             Volver a consultar horario
-          </button>
+          </Button>
           <p role="alert">{message}</p>
         </section>
       )}
       <StaffUsers embedded />
-      <Clients api={api} reload={reload} />
+      <Clients api={api} />
       <AuditSettings api={api} />
     </>
   );
 }
-function Clients({ api, reload }: { api: Api; reload: () => Promise<void> }) {
-  const [list, setList] = useState<
-      { id: string; name: string; contact: string; version: number }[]
-    >([]),
-    [edit, setEdit] = useState<{
-      id?: string;
-      name: string;
-      contact: string;
-      version?: number;
-    } | null>(null),
-    [message, setMessage] = useState(""),
-    [busy, setBusy] = useState(false);
-  async function load() {
-    setList(await api("/clients"));
-  }
+function Clients({ api }: { api: Api }) {
+  const [contacts, setContacts] = useState<
+    { id: string; name: string; contact: string }[]
+  >([]);
+  const [accounts, setAccounts] = useState<
+    {
+      id: string;
+      email: string | null;
+      phone: string | null;
+      active: boolean;
+    }[]
+  >([]);
+  const [message, setMessage] = useState("Consultando clientes…");
   useEffect(() => {
-    void load().catch(() => setMessage("No se pudieron consultar clientes"));
+    let active = true;
+    void Promise.all([api("/clients"), api("/auth/customers")])
+      .then(([list, users]) => {
+        if (active) {
+          setContacts(list);
+          setAccounts(users);
+          setMessage("");
+        }
+      })
+      .catch(() => {
+        if (active) setMessage("No se pudieron consultar los clientes.");
+      });
+    return () => {
+      active = false;
+    };
   }, []);
   return (
-    <section className="panel">
+    <section className="panel staff-users">
       <h2>Clientes</h2>
-      <p>
-        Nombre y referencia opcional. Las ventas conservan el nombre registrado
-        aunque lo edites después.
-      </p>
-      {list.map((c) => (
-        <div className="cartline" key={c.id}>
-          <div>
+      <p>Consulta de clientes registrados y contactos de la tienda.</p>
+      {message && <p role="status">{message}</p>}
+      <h3>Cuentas de compradores</h3>
+      {!message && !accounts.length && <p>No hay compradores registrados.</p>}
+      <ul className="customer-list">
+        {accounts.map((c) => (
+          <li key={c.id}>
+            <strong>{c.email || c.phone || "Cliente"}</strong>
+            <small>{c.active ? "Activa" : "Desactivada"}</small>
+          </li>
+        ))}
+      </ul>
+      <h3>Contactos guardados</h3>
+      {!message && !contacts.length && <p>No hay contactos guardados.</p>}
+      <ul className="customer-list">
+        {contacts.map((c) => (
+          <li key={c.id}>
             <strong>{c.name}</strong>
-            <small>{c.contact}</small>
-          </div>
-          <button onClick={() => setEdit(c)}>Editar</button>
-        </div>
-      ))}
-      <button onClick={() => setEdit({ name: "", contact: "" })}>
-        + Nuevo cliente
-      </button>
-      <p role="status">{message}</p>
-      {edit && (
-        <Modal
-          title={edit.id ? "Editar cliente" : "Nuevo cliente"}
-          close={() => setEdit(null)}
-        >
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setBusy(true);
-              const { id, ...data } = edit;
-              void api(id ? "/clients/" + id : "/clients", {
-                method: id ? "PUT" : "POST",
-                headers: { "Idempotency-Key": crypto.randomUUID() },
-                body: JSON.stringify(data),
-              })
-                .then(load)
-                .then(reload)
-                .then(() => setEdit(null))
-                .catch((e) => setMessage(String(e)))
-                .finally(() => setBusy(false));
-            }}
-          >
-            <label>
-              Nombre
-              <input
-                required
-                maxLength={100}
-                value={edit.name}
-                onChange={(e) => setEdit({ ...edit, name: e.target.value })}
-              />
-            </label>
-            <label>
-              Referencia / contacto (opcional)
-              <input
-                maxLength={100}
-                value={edit.contact}
-                onChange={(e) => setEdit({ ...edit, contact: e.target.value })}
-              />
-            </label>
-            <p role="alert">{message}</p>
-            <button className="primary" disabled={busy}>
-              Guardar cliente
-            </button>
-            <button type="button" onClick={() => setEdit(null)}>
-              Cancelar
-            </button>
-          </form>
-        </Modal>
-      )}
+            {c.contact && <small>{c.contact}</small>}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -956,7 +945,7 @@ function AuditSettings({ api }: { api: Api }) {
         Cada cambio conserva motivo, responsable y antes/después. Últimos 200
         movimientos.
       </p>
-      <button onClick={() => void load()}>Actualizar movimientos</button>
+      <Button onClick={() => void load()}>Actualizar movimientos</Button>
       {rows.map((r) => (
         <article className="audit" key={r.id}>
           <strong>

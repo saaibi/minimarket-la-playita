@@ -87,21 +87,21 @@ input:disabled {
 label {
   display: grid;
   gap: 6px;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin: 14px 0;
   min-width: 0;
 }
 h1 {
-  font-size: 30px;
+  font-size: 1.875rem;
   letter-spacing: -1px;
   margin: 0 0 6px;
 }
 h2 {
-  font-size: 20px;
+  font-size: 1.25rem;
   margin: 0 0 16px;
 }
 h3 {
-  font-size: 17px;
+  font-size: 1.0625rem;
   margin: 10px 0 7px;
 }
 p {
@@ -111,12 +111,12 @@ p {
 small {
   display: block;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.75rem;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
 .eyebrow {
-  font-size: 10px;
+  font-size: 0.625rem;
   letter-spacing: 2px;
   font-weight: 700;
   color: var(--terra);
@@ -146,7 +146,7 @@ small {
   z-index: 30;
 }
 .aside-label {
-  font-size: 9px;
+  font-size: 0.5625rem;
   letter-spacing: 2px;
   text-align: center;
   color: var(--muted);
@@ -170,7 +170,7 @@ small {
 }
 .aside-bottom {
   margin-top: auto;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--muted);
   padding-top: 20px;
 }
@@ -198,10 +198,10 @@ header {
   min-width: 0;
 }
 .header-brand strong {
-  font-size: 17px;
+  font-size: 1.0625rem;
 }
 .identity {
-  font-size: 12px;
+  font-size: 0.75rem;
   max-width: 180px;
 }
 .identity small {
@@ -227,10 +227,10 @@ header {
   padding: 2px 4px;
   background: var(--terra);
   color: white;
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 .environment-banner {
-  font-size: 10px;
+  font-size: 0.625rem;
   padding: 9px 30px;
   background: #eaf0f3;
   color: #385f70;
@@ -259,7 +259,7 @@ header {
   padding: 12px 16px;
   background: #eaf0e3;
   border-radius: 10px;
-  font-size: 12px;
+  font-size: 0.75rem;
   overflow-wrap: anywhere;
 }
 .intro {
@@ -270,7 +270,7 @@ header {
   margin: 20px 0 24px;
 }
 .intro h1 {
-  font-size: 36px;
+  font-size: 2.25rem;
 }
 .intro .eyebrow {
   color: #e8bb91;
@@ -286,7 +286,7 @@ header {
   margin: 20px 0;
 }
 .heading p {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 .heading > button {
@@ -320,27 +320,31 @@ header {
 .product-art {
   width: 100%;
   height: 90px;
-  display: grid;
-  place-items: center;
-  font-size: 50px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3.125rem;
   color: #51744d;
   background: #f0f2e7;
   border-radius: 10px;
   margin-bottom: 16px;
 }
 .price {
-  font-size: 24px;
+  font-size: 1.5rem;
   font-weight: 700;
   margin: 16px 0;
 }
 .price small {
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 400;
 }
 .tag {
   display: inline-block;
   border-radius: 20px;
-  font-size: 10px;
+  font-size: 0.625rem;
   padding: 6px 10px;
   background: #e8f2e7;
   color: #35623b;
@@ -363,7 +367,7 @@ header {
 }
 .stat b {
   display: block;
-  font-size: 25px;
+  font-size: 1.5625rem;
   letter-spacing: -0.5px;
   margin-top: 12px;
   overflow-wrap: anywhere;
@@ -392,7 +396,7 @@ table {
   min-width: 680px;
 }
 th {
-  font-size: 10px;
+  font-size: 0.625rem;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--muted);
@@ -400,7 +404,7 @@ th {
   background: #fafbf7;
 }
 td {
-  font-size: 13px;
+  font-size: 0.8125rem;
   padding: 16px;
   border-top: 1px solid var(--line);
 }
@@ -409,7 +413,7 @@ td:first-child {
   max-width: 290px;
 }
 td button {
-  font-size: 12px;
+  font-size: 0.75rem;
   margin: 3px;
 }
 .buyline,
@@ -419,13 +423,13 @@ td button {
   gap: 12px;
 }
 .buyline select {
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .empty {
   text-align: center;
   padding: 28px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .modal-backdrop {
   position: fixed;
@@ -485,7 +489,7 @@ td button {
   flex: none;
 }
 .total {
-  font-size: 22px;
+  font-size: 1.375rem;
   margin: 10px 0;
 }
 .actions {
@@ -495,7 +499,7 @@ td button {
   margin-top: 12px;
 }
 .actions button {
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .order-card .heading {
   margin: 0;
@@ -519,7 +523,7 @@ td button {
 }
 .notification span {
   display: block;
-  font-size: 12px;
+  font-size: 0.75rem;
   margin-top: 8px;
   color: var(--blue);
 }
@@ -537,7 +541,7 @@ pre {
   overflow-wrap: anywhere;
   max-height: 300px;
   overflow: auto;
-  font-size: 11px;
+  font-size: 0.6875rem;
   background: var(--paper);
   padding: 12px;
 }
@@ -566,16 +570,16 @@ pre {
   accent-color: var(--green);
   flex: none;
 }
-fieldset {
+fieldset:not(.MuiOutlinedInput-notchedOutline) {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 16px;
   min-width: 0;
   margin: 20px 0;
 }
-legend {
+fieldset:not(.MuiOutlinedInput-notchedOutline) > legend {
   font-weight: 600;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .presentation-row {
   border-bottom: 1px solid var(--line);
@@ -595,11 +599,21 @@ legend {
   margin-top: 30px;
 }
 .staff-users > p {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--muted);
 }
 .staff-users .row {
   flex-wrap: wrap;
+  min-width: 0;
+}
+.staff-users .row > span {
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.staff-users .row > button {
+  flex: 0 0 auto;
 }
 .login-page {
   width: min(100%, 600px);
@@ -615,7 +629,7 @@ legend {
   max-width: 75vw;
 }
 .login-page .intro h1 {
-  font-size: 28px;
+  font-size: 1.75rem;
 }
 .login-page .panel > button {
   display: block;
@@ -638,15 +652,15 @@ footer {
   padding: 30px;
   text-align: center;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 [role="alert"]:not(:empty) {
   color: #a1422b;
-  font-size: 13px;
+  font-size: 0.8125rem;
   overflow-wrap: anywhere;
 }
 .order-card .price {
-  font-size: 22px;
+  font-size: 1.375rem;
 }
 .orders {
   align-items: start;
@@ -700,7 +714,7 @@ footer {
     flex: 1;
     min-width: 0;
     padding: 8px 2px;
-    font-size: 9px;
+    font-size: 0.5625rem;
     white-space: normal;
   }
   .sidebar nav svg {
@@ -722,14 +736,14 @@ footer {
     display: none;
   }
   .header-brand small {
-    font-size: 10px;
+    font-size: 0.625rem;
     max-width: 100px;
   }
   .header-actions {
     gap: 7px;
   }
   .header-actions > button:last-child {
-    font-size: 11px;
+    font-size: 0.6875rem;
     padding: 8px;
     min-width: 44px;
   }
@@ -745,7 +759,7 @@ footer {
   }
   .environment-banner {
     padding: 9px 14px;
-    font-size: 9px;
+    font-size: 0.5625rem;
   }
   .shell main {
     padding: 16px 14px;
@@ -755,13 +769,13 @@ footer {
     flex-wrap: wrap;
   }
   h1 {
-    font-size: 27px;
+    font-size: 1.6875rem;
   }
   .intro {
     padding: 24px 20px;
   }
   .intro h1 {
-    font-size: 30px;
+    font-size: 1.875rem;
   }
   .cards {
     grid-template-columns: minmax(0, 1fr);
@@ -785,14 +799,14 @@ footer {
   }
   .stat {
     padding: 16px;
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .stat b {
-    font-size: 22px;
+    font-size: 1.375rem;
   }
   .cart-dock {
     padding: 10px 14px;
-    font-size: 12px;
+    font-size: 0.75rem;
   }
   .cart-dock strong {
     display: block;
@@ -802,7 +816,7 @@ footer {
     grid-template-columns: 1fr 1fr;
   }
   .schedule-day strong {
-    font-size: 13px;
+    font-size: 0.8125rem;
   }
   .schedule-day label {
     margin: 4px 0;
@@ -820,7 +834,7 @@ footer {
     padding: 12px 16px;
   }
   .dialog-top h2 {
-    font-size: 18px;
+    font-size: 1.125rem;
   }
   .form-grid {
     grid-template-columns: 1fr;
@@ -829,7 +843,7 @@ footer {
     padding: 20px 14px;
   }
   .login-page .intro h1 {
-    font-size: 26px;
+    font-size: 1.625rem;
   }
   .login-page .brand-logo {
     width: 180px;
@@ -850,7 +864,7 @@ footer {
     gap: 8px;
   }
   .sidebar nav button {
-    font-size: 8px;
+    font-size: 0.5rem;
   }
   .buyline {
     grid-template-columns: 1fr;
@@ -859,7 +873,7 @@ footer {
     grid-template-columns: 1fr;
   }
   .stats .stat b {
-    font-size: 20px;
+    font-size: 1.25rem;
   }
 }
 .hero {
@@ -877,16 +891,22 @@ footer {
   object-fit: cover;
 }
 .hero h1 {
-  font-size: 38px;
+  font-size: 2.375rem;
+}
+.product-art.has-photo {
+  height: 180px;
+  padding: 0;
 }
 .product-art img {
+  display: block;
   height: 100%;
   width: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  max-width: 100%;
   object-fit: cover;
-  border-radius: 10px;
-}
-.product-art:has(img) {
-  padding: 0;
+  border-radius: inherit;
 }
 .photo-preview {
   width: 130px;
@@ -910,7 +930,7 @@ footer {
     margin: 20px -20px 0;
   }
   .hero h1 {
-    font-size: 32px;
+    font-size: 2rem;
   }
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -975,4 +995,162 @@ footer {
 }
 .product-photo small {
   display: block;
+}
+
+/* Material fields own their borders and spacing; labels remain native and accessible. */
+.MuiInputBase-root input,
+.MuiInputBase-root textarea,
+.MuiInputBase-root select {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  min-height: 0;
+}
+label .MuiInputBase-root {
+  width: 100%;
+  min-width: 0;
+}
+.MuiCheckbox-root {
+  width: auto;
+  justify-self: start;
+  padding: 6px;
+}
+.MuiCheckbox-root input {
+  padding: 0;
+  min-height: 0;
+}
+.MuiNativeSelect-select {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.MuiListItem-root.row {
+  gap: 14px;
+  padding: 14px 0;
+  align-items: flex-start;
+}
+.MuiChip-root.store-status {
+  height: auto;
+  min-height: 26px;
+  max-width: 100%;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.MuiChip-root.store-status .MuiChip-label {
+  white-space: normal;
+  padding: 3px 8px;
+}
+.text-size-settings .MuiSlider-root {
+  width: calc(100% - 24px);
+  margin: 0 12px;
+}
+@media (max-width: 800px) {
+  .header-brand {
+    min-width: 0;
+  }
+  .header-brand > div {
+    min-width: 0;
+  }
+  .MuiChip-root.store-status {
+    font-size: 0.625rem;
+  }
+  .MuiButton-root.icon-button {
+    min-width: 40px;
+  }
+}
+
+/* Material buttons retain each screen's reading order and alignment. */
+.notification.MuiButton-root {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 8px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.notification.MuiButton-root > * {
+  max-width: 100%;
+}
+.notification.MuiButton-root small {
+  display: block;
+  color: var(--muted);
+}
+.notification-tabs {
+  flex-wrap: wrap;
+}
+.stat.MuiButton-root {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  white-space: normal;
+  min-width: 0;
+}
+.sidebar nav .MuiButton-root {
+  justify-content: flex-start;
+  min-width: 0;
+}
+.sidebar nav .MuiButton-root svg {
+  flex-shrink: 0;
+}
+@media (max-width: 760px) {
+  .sidebar nav .MuiButton-root {
+    justify-content: center;
+  }
+}
+
+/* The outline is decorative, never a second field in the flex layout. */
+.MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  pointer-events: none;
+  border: 1px solid #aebeb2;
+  border-radius: inherit;
+}
+
+.product-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+}
+.product-actions-cell {
+  white-space: nowrap;
+}
+.product-actions .MuiButton-root {
+  margin: 0;
+  padding: 5px 10px;
+}
+.MuiButton-root.icon-button {
+  padding: 6px;
+  min-width: 40px;
+  width: 40px;
+}
+.sidebar nav .MuiButton-root {
+  padding: 10px 12px;
+  gap: 8px;
+}
+@media (max-width: 800px) {
+  .sidebar nav .MuiButton-root {
+    padding: 6px 2px;
+    gap: 3px;
+  }
+}
+
+.customer-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.customer-list li {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+  min-width: 0;
 }

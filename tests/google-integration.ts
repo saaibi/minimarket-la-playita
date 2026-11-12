@@ -132,6 +132,106 @@ test(
         ).rows[0].role,
         "admin",
       );
+      // The owner explicitly assigns roles by email; Google must prove ownership.
+      const ownerEmail = "google-owner@gmail.com";
+      await server.pool.query(
+        "UPDATE app_users SET email=$1 WHERE email='owner@example.invalid'",
+        [ownerEmail],
+      );
+      async function googleSign(subject: string, email: string) {
+        const c = (await req("/auth/google/challenge", {})).data;
+        return req("/auth/google/verify", {
+          challengeId: c.challengeId,
+          proof: c.proof,
+          credential: await jwt(c.nonce, subject, email),
+        });
+      }
+      const ownerGoogle = await googleSign("owner-sub", ownerEmail);
+      assert.equal(ownerGoogle.status, 200);
+      assert.equal(ownerGoogle.data.actor.role, "admin");
+      const adminHeaders = {
+        Authorization: "Bearer " + ownerGoogle.data.accessToken,
+      };
+      const sellerEmail = "google-seller@gmail.com";
+      assert.equal(
+        (
+          await req(
+            "/auth/users/assign-role",
+            { email: sellerEmail, role: "seller" },
+            adminHeaders,
+          )
+        ).status,
+        201,
+      );
+      const sellerGoogle = await googleSign("seller-sub", sellerEmail);
+      assert.equal(sellerGoogle.data.actor.role, "seller");
+      assert.equal(
+        (
+          await req(
+            "/auth/users/assign-role",
+            { email: "attacker@gmail.com", role: "admin" },
+            { Authorization: "Bearer " + sellerGoogle.data.accessToken },
+          )
+        ).status,
+        403,
+      );
+      const customers = await req("/auth/customers", undefined, adminHeaders);
+      assert.equal(customers.status, 200);
+      assert.ok(
+        customers.data.some((u: any) => u.email === "buyer@example.invalid"),
+      );
+      assert.equal(
+        customers.data.some((u: any) => u.password_hash !== undefined),
+        false,
+      );
+      assert.equal(
+        (
+          await req("/auth/customers", undefined, {
+            Authorization: "Bearer " + sellerGoogle.data.accessToken,
+          })
+        ).status,
+        403,
+      );
+      // Role reassignment revokes previous sessions, and a known subject uses its current role.
+      assert.equal(
+        (
+          await req(
+            "/auth/users/assign-role",
+            { email: sellerEmail, role: "buyer" },
+            adminHeaders,
+          )
+        ).status,
+        200,
+      );
+      assert.equal(
+        (
+          await req("/auth/me", undefined, {
+            Authorization: "Bearer " + sellerGoogle.data.accessToken,
+          })
+        ).status,
+        401,
+      );
+      const changed = await googleSign("seller-sub", sellerEmail);
+      assert.equal(changed.data.actor.role, "buyer");
+      assert.equal(
+        (await googleSign("different-seller-sub", sellerEmail)).status,
+        409,
+      );
+      assert.equal(
+        (
+          await req(
+            "/auth/users/assign-role",
+            { email: ownerEmail, role: "buyer" },
+            adminHeaders,
+          )
+        ).status,
+        409,
+      );
+      await server.pool.query(
+        "UPDATE app_users SET active=false WHERE email=$1",
+        [sellerEmail],
+      );
+      assert.equal((await googleSign("seller-sub", sellerEmail)).status, 403);
       const expired = (await req("/auth/google/challenge", {})).data;
       await server.pool.query(
         "UPDATE google_challenges SET expires_at=now()-interval '1 minute' WHERE id=$1",

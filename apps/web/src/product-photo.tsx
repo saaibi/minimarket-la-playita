@@ -1,3 +1,4 @@
+import { Button, Input } from "./material.js";
 import React, { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Camera, EncodingType } from "@capacitor/camera";
@@ -187,22 +188,22 @@ export function ProductPhoto({
     <fieldset className="product-photo">
       <legend>Foto opcional</legend>
       <div className="photo-actions">
-        <button
+        <Button
           type="button"
           disabled={working}
           onClick={() => upload.current?.click()}
         >
           Cargar archivo
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
           disabled={working}
           onClick={() => void takePhoto()}
         >
           Tomar foto
-        </button>
+        </Button>
       </div>
-      <input
+      <Input
         ref={upload}
         type="file"
         hidden
@@ -235,10 +236,10 @@ export function ProductPhoto({
             aria-label="Vista previa de cámara"
           />
           <div className="photo-actions">
-            <button type="button" disabled={!ready} onClick={capture}>
+            <Button type="button" disabled={!ready} onClick={capture}>
               Capturar foto
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={() => {
                 operation.current++;
@@ -247,7 +248,7 @@ export function ProductPhoto({
               }}
             >
               Cancelar cámara
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -259,9 +260,9 @@ export function ProductPhoto({
             src={photo}
             alt="Vista previa del producto"
           />
-          <button type="button" disabled={working} onClick={() => onChange("")}>
+          <Button type="button" disabled={working} onClick={() => onChange("")}>
             Quitar foto
-          </button>
+          </Button>
         </div>
       )}
       {error && <p role="alert">{error}</p>}

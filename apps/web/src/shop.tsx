@@ -1,3 +1,6 @@
+import Chip from "@mui/material/Chip";
+import Card from "@mui/material/Card";
+import { Button, Input, Select } from "./material.js";
 import React, { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import {
@@ -482,22 +485,22 @@ export function Shop() {
     return (
       <>
         <div className="notification-tabs">
-          <button
+          <Button
             aria-pressed={noticeTab === "orders"}
             onClick={() => setNoticeTab("orders")}
           >
             Pedidos
-          </button>
+          </Button>
           {staff && (
-            <button
+            <Button
               aria-pressed={noticeTab === "inventory"}
               onClick={() => setNoticeTab("inventory")}
             >
               Inventario
-            </button>
+            </Button>
           )}
         </div>
-        <button
+        <Button
           onClick={() =>
             void (async () => {
               try {
@@ -519,10 +522,10 @@ export function Shop() {
           }
         >
           Marcar esta sección como leída
-        </button>
+        </Button>
         {list.length ? (
           list.map((n) => (
-            <button
+            <Button
               className={"notification " + (n.read ? "" : "unread")}
               key={n.id}
               onClick={() => void openNotice(n)}
@@ -553,7 +556,7 @@ export function Shop() {
                   ? "Ver pedido y acciones"
                   : "Consultar inventario"}
               </span>
-            </button>
+            </Button>
           ))
         ) : (
           <p className="empty">No hay notificaciones en esta sección.</p>
@@ -585,42 +588,42 @@ export function Shop() {
               ? "Nequi pendiente · integración no disponible"
               : "Efectivo pendiente"}
         </small>
-        {detail && <button onClick={() => setSelected(o)}>Ver detalle</button>}
+        {detail && <Button onClick={() => setSelected(o)}>Ver detalle</Button>}
         {!["delivered", "cancelled"].includes(o.status) && (
           <div className="actions">
             {staff && o.status === "confirmed" && (
-              <button disabled={busy} onClick={() => void action(o, "accept")}>
+              <Button disabled={busy} onClick={() => void action(o, "accept")}>
                 Aceptar
-              </button>
+              </Button>
             )}
             {staff && o.status === "accepted" && (
-              <button disabled={busy} onClick={() => void action(o, "ready")}>
+              <Button disabled={busy} onClick={() => void action(o, "ready")}>
                 Marcar listo
-              </button>
+              </Button>
             )}
             {staff &&
               o.paymentMethod === "cash" &&
               o.paymentStatus !== "paid" && (
-                <button
+                <Button
                   disabled={busy}
                   onClick={() => void action(o, "pay_cash")}
                 >
                   Confirmar efectivo recibido
-                </button>
+                </Button>
               )}
             {staff && o.status === "ready" && o.paymentStatus === "paid" && (
-              <button
+              <Button
                 className="primary"
                 disabled={busy}
                 onClick={() => void action(o, "deliver")}
               >
                 Entregar
-              </button>
+              </Button>
             )}
             {o.paymentStatus !== "paid" && (
-              <button disabled={busy} onClick={() => void action(o, "cancel")}>
+              <Button disabled={busy} onClick={() => void action(o, "cancel")}>
                 Cancelar pedido
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -643,7 +646,7 @@ export function Shop() {
               ([id]) => id !== "settings" || session.mode === "authenticated",
             )
             .map(([id, label]) => (
-              <button
+              <Button
                 key={id}
                 className={view === id ? "active" : ""}
                 disabled={pendingSale && id !== "pos"}
@@ -654,7 +657,7 @@ export function Shop() {
               >
                 <Icon name={id === "notifications" ? "bell" : id} />
                 <span>{label}</span>
-              </button>
+              </Button>
             ))}
         </nav>
         <div className="aside-bottom">
@@ -666,26 +669,33 @@ export function Shop() {
           <div className="header-brand">
             <Brand compact />
             <div>
-              <strong>La Playita</strong>
-              <small>
-                {open === null
-                  ? "Horario sin consultar"
-                  : open
-                    ? "Abierta · Recogida en tienda"
-                    : "Cerrada · Horario de atención"}
-              </small>
+              <Chip
+                className="store-status"
+                size="small"
+                role="status"
+                aria-live="polite"
+                label={
+                  open === null
+                    ? "Consultando horario"
+                    : open
+                      ? "Abierta"
+                      : "Cerrada"
+                }
+                color={open === null ? "default" : open ? "success" : "error"}
+                variant="outlined"
+              />
             </div>
           </div>
           <div className="header-actions">
-            <button
+            <Button
               className="icon-button"
               aria-label="Ver canasta"
               onClick={() => setCartOpen(true)}
             >
               <Icon name="basket" />
               {cart.length > 0 && <span className="badge">{cart.length}</span>}
-            </button>
-            <button
+            </Button>
+            <Button
               className="icon-button"
               aria-label="Notificaciones"
               onClick={() => {
@@ -699,12 +709,12 @@ export function Shop() {
                   {notices.filter((n) => !n.read).length}
                 </span>
               )}
-            </button>
+            </Button>
             <div className="identity">
               <strong>{roles[role]}</strong>
               <small>{session.actor.label}</small>
             </div>
-            <button onClick={() => void logout()}>Salir</button>
+            <Button onClick={() => void logout()}>Salir</Button>
           </div>
         </header>
         <div className="environment-banner">RECOGIDA EN TIENDA · COP</div>
@@ -713,7 +723,7 @@ export function Shop() {
             <span>
               {cart.length} líneas en la canasta <strong>{money(total)}</strong>
             </span>
-            <button onClick={() => setCartOpen(true)}>Ver canasta</button>
+            <Button onClick={() => setCartOpen(true)}>Ver canasta</Button>
           </div>
         )}
         <main>
@@ -773,13 +783,13 @@ export function Shop() {
                 )}
               </section>
               <div className="toolbar">
-                <input
+                <Input
                   aria-label="Buscar productos"
                   placeholder="Buscar producto o código…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
-                <select
+                <Select
                   aria-label="Categoría"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
@@ -790,10 +800,10 @@ export function Shop() {
                   ].map((c) => (
                     <option key={c}>{c}</option>
                   ))}
-                </select>
-                <button onClick={() => setCartOpen(true)}>
+                </Select>
+                <Button onClick={() => setCartOpen(true)}>
                   Canasta · {money(total)}
-                </button>
+                </Button>
               </div>
               <div className="cards">
                 {products
@@ -850,14 +860,14 @@ export function Shop() {
                   </p>
                 </div>
                 {view === "orders" && (
-                  <select
+                  <Select
                     aria-label="Filtrar pedidos"
                     value={orderFilter}
                     onChange={(e) => setOrderFilter(e.target.value)}
                   >
                     <option value="active">Pendientes</option>
                     <option value="all">Todos</option>
-                  </select>
+                  </Select>
                 )}
               </div>
               {view === "history" && (
@@ -890,7 +900,7 @@ export function Shop() {
               {native && (
                 <section className="panel">
                   <h2>Pedidos guardados en este dispositivo</h2>
-                  <button
+                  <Button
                     onClick={() =>
                       void worker.current
                         ?.sync()
@@ -906,12 +916,12 @@ export function Shop() {
                     }
                   >
                     Reintentar envío
-                  </button>
+                  </Button>
                   {rows.map((r) => (
                     <div className="queue" key={r.request_key}>
                       <strong>{statusName[r.status]}</strong>
                       {r.status === "conflict" && !r.resolved_by && (
-                        <button
+                        <Button
                           onClick={() => {
                             const d = JSON.parse(r.payload) as OrderDraft;
                             setCart(d.lines);
@@ -925,7 +935,7 @@ export function Shop() {
                           }}
                         >
                           Revisar en canasta
-                        </button>
+                        </Button>
                       )}
                       {r.resolved_by && (
                         <small>
@@ -989,12 +999,12 @@ export function Shop() {
                     )}
                   </small>
                 </div>
-                <button
+                <Button
                   disabled={pendingSale || busy}
                   onClick={() => setCart((c) => c.filter((_, j) => i !== j))}
                 >
                   Quitar
-                </button>
+                </Button>
               </div>
             ))
           ) : (
@@ -1003,12 +1013,13 @@ export function Shop() {
           {staff && (
             <label>
               Cliente (opcional)
-              <select
+              <Select
+                value={clients.find((c) => c.name === client)?.id || ""}
                 disabled={pendingSale || busy}
                 onChange={(e) => {
                   const c = clients.find((c) => c.id === e.target.value);
                   setClient(c?.name || "");
-                  setReference(c?.contact || "");
+                  setReference("");
                 }}
               >
                 <option value="">Cliente general</option>
@@ -1018,32 +1029,25 @@ export function Shop() {
                     {c.contact ? " · " + c.contact : ""}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           )}
-          <label>
-            Nombre del cliente (opcional)
-            <input
-              maxLength={100}
-              value={client}
-              disabled={pendingSale || busy}
-              onChange={(e) => setClient(e.target.value)}
-              placeholder="Vacío = Cliente general"
-            />
-          </label>
-          <label>
-            Referencia (opcional)
-            <input
-              maxLength={100}
-              value={reference}
-              disabled={pendingSale || busy}
-              onChange={(e) => setReference(e.target.value)}
-            />
-          </label>
+          {!staff && (
+            <label>
+              Cliente (opcional)
+              <Input
+                maxLength={100}
+                value={client}
+                disabled={pendingSale || busy}
+                onChange={(e) => setClient(e.target.value)}
+                placeholder="Cliente general"
+              />
+            </label>
+          )}
           {!(staff && view === "pos") && (
             <label>
               Forma de pago
-              <select
+              <Select
                 value={payment}
                 disabled={busy}
                 onChange={(e) => setPayment(e.target.value as "cash" | "nequi")}
@@ -1052,14 +1056,14 @@ export function Shop() {
                 <option value="nequi">
                   Nequi · sin integración, pago pendiente
                 </option>
-              </select>
+              </Select>
             </label>
           )}
           {staff && view === "pos" && (
             <>
               <label>
                 Efectivo recibido (COP)
-                <input
+                <Input
                   inputMode="numeric"
                   type="number"
                   min="0"
@@ -1096,7 +1100,7 @@ export function Shop() {
             </p>
           )}
           <p role="alert">{message}</p>
-          <button
+          <Button
             className="primary"
             disabled={busy || !cart.length}
             onClick={() => void send()}
@@ -1108,10 +1112,10 @@ export function Shop() {
                 : revision
                   ? "Enviar revisión"
                   : "Enviar pedido"}
-          </button>
-          <button disabled={busy} onClick={() => setCartOpen(false)}>
+          </Button>
+          <Button disabled={busy} onClick={() => setCartOpen(false)}>
             Cerrar canasta
-          </button>
+          </Button>
         </Modal>
       )}
       {bellOpen && (
@@ -1168,8 +1172,11 @@ export function ProductCard({
   const pres = p.presentations.find((v) => v.id === id) || p.presentations[0],
     price = pres?.priceCop ?? p.priceCop;
   return (
-    <article className="card">
-      <div className="product-art" aria-hidden="true">
+    <Card component="article" className="card" variant="outlined">
+      <div
+        className={"product-art" + (p.photo ? " has-photo" : "")}
+        aria-hidden="true"
+      >
         {p.photo ? (
           <img src={p.photo} alt={p.name} />
         ) : p.name.toLocaleLowerCase().includes("huevo") ? (
@@ -1205,7 +1212,7 @@ export function ProductCard({
       <div className="buyline">
         <label>
           Cantidad
-          <input
+          <Input
             type="number"
             min={p.kind === "weight" ? ".001" : "1"}
             step={p.kind === "weight" ? ".001" : "1"}
@@ -1216,15 +1223,15 @@ export function ProductCard({
         <label>
           {p.kind === "weight" ? "Unidad" : "Presentación"}
           {p.kind === "weight" ? (
-            <select
+            <Select
               value={unit}
               onChange={(e) => setUnit(e.target.value as "kg" | "lb")}
             >
               <option value="kg">Kilo</option>
               <option value="lb">Libra</option>
-            </select>
+            </Select>
           ) : (
-            <select
+            <Select
               value={pres?.id || ""}
               onChange={(e) => setId(e.target.value)}
             >
@@ -1233,11 +1240,11 @@ export function ProductCard({
                   {v.name} · {money(v.priceCop)}
                 </option>
               ))}
-            </select>
+            </Select>
           )}
         </label>
       </div>
-      <button
+      <Button
         className="primary"
         disabled={disabled || p.available <= 0}
         onClick={() => {
@@ -1259,8 +1266,8 @@ export function ProductCard({
         }}
       >
         + Agregar
-      </button>
+      </Button>
       <small role="alert">{error}</small>
-    </article>
+    </Card>
   );
 }
