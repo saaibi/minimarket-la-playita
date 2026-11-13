@@ -171,7 +171,7 @@ test(
               token: tokens[i],
             })
           ).status,
-          200,
+          201,
         );
       const settings = (await req("/settings", admin.accessToken)).data;
       settings.override = "open";
