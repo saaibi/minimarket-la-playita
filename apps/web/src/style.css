@@ -1399,3 +1399,26 @@ label .MuiInputBase-root {
   white-space: nowrap;
   border: 0;
 }
+
+/* Autocomplete keeps a full touch target and room for clear/open actions. */
+.account-picker .MuiAutocomplete-root .MuiOutlinedInput-root {
+  min-height: 48px;
+  padding: 6px 66px 6px 12px;
+  align-items: center;
+}
+.account-picker .MuiAutocomplete-root .MuiAutocomplete-input {
+  padding: 5px 0 !important;
+  height: auto;
+  line-height: 1.5;
+  font-size: 0.875rem;
+}
+.account-picker .MuiAutocomplete-endAdornment {
+  top: 50%;
+  transform: translateY(-50%);
+  right: 7px;
+}
+.account-picker .MuiAutocomplete-endAdornment .MuiIconButton-root {
+  min-height: 30px;
+  min-width: 30px;
+  padding: 4px;
+}

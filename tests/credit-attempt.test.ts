@@ -8,6 +8,7 @@ test("Crédito: una respuesta perdida conserva solicitud y clave por usuario; ot
     document: dom.window.document,
     HTMLElement: dom.window.HTMLElement,
     Element: dom.window.Element,
+    ShadowRoot: dom.window.ShadowRoot,
     localStorage: dom.window.localStorage,
   });
   const { auth } = await import("../apps/web/src/session.js");
@@ -66,6 +67,7 @@ test("Canasta: pago más abono muestra reparto y confirma una sola solicitud", a
     document: dom.window.document,
     HTMLElement: dom.window.HTMLElement,
     Element: dom.window.Element,
+    ShadowRoot: dom.window.ShadowRoot,
     localStorage: dom.window.localStorage,
     IS_REACT_ACT_ENVIRONMENT: true,
   });
@@ -124,6 +126,26 @@ test("Canasta: pago más abono muestra reparto y confirma una sola solicitud", a
     fireEvent.click(
       view.getByRole("option", { name: /cliente@example.invalid/ }),
     );
+    const clientInput = view.getByRole("combobox") as HTMLInputElement;
+    assert.notEqual(document.activeElement, clientInput);
+    assert.equal(clientInput.value, "cliente@example.invalid");
+    fireEvent.click(view.getByRole("button", { name: "Borrar cliente" }));
+    assert.equal(clientInput.value, "");
+    assert.equal(view.queryByText("Saldo después de confirmar:"), null);
+    fireEvent.mouseDown(clientInput);
+    fireEvent.click(
+      await view.findByRole("option", { name: /cliente@example.invalid/ }),
+    );
+    clientInput.focus();
+    fireEvent.change(clientInput, { target: { value: "cliente" } });
+    assert.equal(clientInput.value, "cliente");
+    fireEvent.change(clientInput, { target: { value: "" } });
+    assert.equal(clientInput.value, "");
+    fireEvent.change(clientInput, { target: { value: "cliente" } });
+    fireEvent.click(
+      await view.findByRole("option", { name: /cliente@example.invalid/ }),
+    );
+    assert.notEqual(document.activeElement, clientInput);
     fireEvent.change(view.getByLabelText("Efectivo recibido (COP)"), {
       target: { value: "10000" },
     });
@@ -155,6 +177,7 @@ test("Créditos: solo habilitados por defecto, búsqueda y deudas deshabilitadas
     document: dom.window.document,
     HTMLElement: dom.window.HTMLElement,
     Element: dom.window.Element,
+    ShadowRoot: dom.window.ShadowRoot,
     localStorage: dom.window.localStorage,
     IS_REACT_ACT_ENVIRONMENT: true,
   });
@@ -239,6 +262,7 @@ test("Contado: general y cuenta sin crédito muestran faltante o cambio sin abon
     document: dom.window.document,
     HTMLElement: dom.window.HTMLElement,
     Element: dom.window.Element,
+    ShadowRoot: dom.window.ShadowRoot,
     localStorage: dom.window.localStorage,
     IS_REACT_ACT_ENVIRONMENT: true,
   });

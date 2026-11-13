@@ -120,6 +120,7 @@ export function Checkout({
       mode: "cash",
       received: "",
     }),
+    [clientSearch, setClientSearch] = useState(""),
     [clients, setClients] = useState<any[]>([]),
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(false),
@@ -156,6 +157,9 @@ export function Checkout({
     change = Math.max(0, cash - total - abono),
     paidNow = Math.min(Math.max(0, cash), total),
     futureBalance = balance + newCredit - abono;
+  useEffect(() => {
+    if (client) setClientSearch(client.name);
+  }, [client?.id, client?.name]);
   async function submit(retry = false) {
     setBusy(true);
     onBusy(true);
@@ -193,21 +197,33 @@ export function Checkout({
             { id: "", name: "Cliente general" },
             ...clients.filter((c) => c.active),
           ]}
-          value={client || { id: "", name: "Cliente general" }}
+          value={client || null}
+          inputValue={clientSearch}
+          blurOnSelect
+          onInputChange={(_event, text, reason) => {
+            if (reason === "input" || reason === "clear") {
+              setClientSearch(text);
+              if (clientId) update({ ...current, clientId: "" });
+            }
+          }}
           getOptionLabel={(option) => option.name}
           isOptionEqualToValue={(option, value) => option.id === value.id}
           disabled={busy || !!attempt || loading}
-          onChange={(_event, selected) =>
-            update({ ...current, clientId: selected?.id || "" })
-          }
+          onChange={(_event, selected) => {
+            setClientSearch(selected?.id ? selected.name : "");
+            update({ ...current, clientId: selected?.id || "" });
+          }}
           noOptionsText="No se encontraron cuentas"
           openText="Buscar cliente"
           closeText="Cerrar opciones"
-          clearText="Cliente general"
+          clearText="Borrar cliente"
           size="small"
           fullWidth
           renderInput={(params) => (
-            <TextField {...params} placeholder="Buscar por correo" />
+            <TextField
+              {...params}
+              placeholder="Cliente general · buscar cuenta"
+            />
           )}
           renderOption={(props, option) => {
             const { key, ...rest } = props;
