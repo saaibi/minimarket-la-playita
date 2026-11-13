@@ -11,6 +11,8 @@ export function Brand({ compact = false }: { compact?: boolean }) {
 }
 export function Icon({ name }: { name: string }) {
   const paths: Record<string, string> = {
+    detail:
+      "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12ZM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6",
     inventory: "M4 7h16v13H4zM3 3h18v4H3zM9 11h6",
     pos: "M3 3h18v13H3zM8 21h8M12 16v5M7 7h3M7 11h8",
     orders: "M6 4h12v17H6zM9 2h6v4H9M9 10h6M9 14h6",

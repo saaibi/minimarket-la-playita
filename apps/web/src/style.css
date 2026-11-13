@@ -1575,3 +1575,108 @@ label .MuiInputBase-root {
     grid-column: 1 / -1;
   }
 }
+
+/* Credit accounts use the same compact, text-size-aware two-column layout. */
+.credit-grid.cards {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+.credit-grid .credit-account-card {
+  padding: 12px;
+  gap: 6px;
+}
+.credit-grid .credit-account-card h2 {
+  font-size: 0.875rem;
+  line-height: 1.35;
+}
+.credit-grid .credit-account-card > small {
+  font-size: 0.7rem;
+}
+.credit-grid .credit-account-card .credit-account-balance {
+  font-size: 1rem;
+}
+.credit-grid .credit-account-card > .MuiButton-root {
+  width: 100%;
+  margin-top: auto;
+  padding: 6px;
+  min-height: 40px;
+  font-size: 0.75rem;
+  white-space: normal;
+}
+@media (max-width: 600px) {
+  .credit-grid.cards {
+    gap: 10px;
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(min(100%, max(9rem, calc(50% - 5px))), 1fr)
+    );
+  }
+  .credit-grid .credit-account-card {
+    padding: 10px;
+  }
+  .credit-grid .credit-account-card h2 {
+    font-size: 0.8125rem;
+  }
+}
+
+.notification.notification-row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) 40px;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  margin: 10px 0 0;
+  border: 1px solid #dce4df;
+  border-radius: 12px;
+  background: #f8faf8;
+}
+.notification.notification-row.unread {
+  border-color: #8dbfe0;
+  border-left: 4px solid #17658d;
+  background: #edf6fc;
+}
+.notification-row .notification-dot {
+  width: 7px;
+  height: 7px;
+  margin: 0;
+  border-radius: 50%;
+  border: 1px solid #8b9a91;
+  background: transparent;
+}
+.notification-row.unread .notification-dot {
+  border-color: #17658d;
+  background: #17658d;
+}
+.notification-content {
+  min-width: 0;
+}
+.notification-content strong {
+  display: block;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.notification-content time {
+  display: block;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.notification-content p {
+  margin: 5px 0 0;
+  font-size: 0.8rem;
+}
+.notification-content small {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+.notification-detail.MuiButton-root {
+  padding: 6px;
+  min-width: 40px;
+  min-height: 40px;
+  color: var(--blue);
+  border-color: #b9cbd4;
+}

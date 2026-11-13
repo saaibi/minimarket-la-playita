@@ -590,38 +590,61 @@ export function Shop() {
         </Button>
         {list.length ? (
           list.map((n) => (
-            <Button
-              className={"notification " + (n.read ? "" : "unread")}
+            <article
+              className={
+                "notification notification-row " + (n.read ? "read" : "unread")
+              }
               key={n.id}
-              onClick={() => void openNotice(n)}
+              aria-label={`${n.kind.startsWith("order.") ? "Pedido" : "Inventario"}: ${n.read ? "leída" : "sin leer"}`}
             >
-              <strong>
-                {n.kind.startsWith("order.")
-                  ? "Pedido · " + (stateName[n.kind.slice(6)] || "Actualizado")
-                  : "Inventario actualizado"}
-              </strong>
-              <small>
-                {new Date(n.createdAt).toLocaleString("es-CO", {
-                  timeZone: "America/Bogota",
-                })}{" "}
-                · {n.read ? "Leída" : "Sin leer"}
-              </small>
-              {n.kind === "inventory.changed" && (
-                <span>
-                  {n.payload.name}
-                  <small>
-                    {n.payload.available} disponibles · Mínimo{" "}
-                    {n.payload.minimum}{" "}
-                    {n.payload.kind === "weight" ? "g" : "unidades"}
-                  </small>
-                </span>
-              )}
-              <span>
-                {n.payload.orderId
-                  ? "Ver pedido y acciones"
-                  : "Consultar inventario"}
-              </span>
-            </Button>
+              <span className="notification-dot" aria-hidden="true" />
+              <div className="notification-content">
+                <strong>
+                  {n.kind.startsWith("order.")
+                    ? "Pedido · " +
+                      (stateName[n.kind.slice(6)] || "Actualizado")
+                    : "Inventario actualizado"}
+                </strong>
+                <time dateTime={n.createdAt}>
+                  {new Date(n.createdAt).toLocaleString("es-CO", {
+                    timeZone: "America/Bogota",
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </time>
+                {n.kind === "inventory.changed" && (
+                  <p>
+                    {n.payload.name}
+                    <small>
+                      {n.payload.available} disponibles · Mínimo{" "}
+                      {n.payload.minimum}{" "}
+                      {n.payload.kind === "weight" ? "g" : "unidades"}
+                    </small>
+                  </p>
+                )}
+              </div>
+              <Button
+                className="icon-button notification-detail"
+                aria-label={
+                  "Ver detalle: " +
+                  (n.kind.startsWith("order.")
+                    ? "Pedido · " +
+                      (stateName[n.kind.slice(6)] || "Actualizado")
+                    : "Inventario actualizado")
+                }
+                title={
+                  n.payload.orderId
+                    ? "Ver pedido y acciones"
+                    : "Consultar inventario"
+                }
+                onClick={() => void openNotice(n)}
+              >
+                <Icon name="detail" />
+              </Button>
+            </article>
           ))
         ) : (
           <p className="empty">No hay notificaciones en esta sección.</p>

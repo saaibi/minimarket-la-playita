@@ -484,7 +484,7 @@ export function Credits({
       <p className="price">
         Por cobrar total: {money(clients.reduce((n, c) => n + c.balanceCop, 0))}
       </p>
-      <div className="cards">
+      <div className="cards credit-grid">
         {visibleClients.map((c) => (
           <article className="panel credit-account-card" key={c.id}>
             <h2>{c.name}</h2>

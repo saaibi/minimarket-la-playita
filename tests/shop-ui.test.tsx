@@ -57,7 +57,8 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
     overrideDate: "2000-01-01",
     version: 0,
   };
-  let inventoryReads = 0;
+  let inventoryReads = 0,
+    noticeReadWrites = 0;
   globalThis.fetch = async (input, init) => {
     const path = String(input);
     if (path.endsWith("/auth/login") || path.endsWith("/auth/guest"))
@@ -77,6 +78,41 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
       ]);
     }
     if (path.endsWith("/settings")) return Response.json(settings);
+    if (path.endsWith("/notifications"))
+      return Response.json([
+        {
+          id: "notice-read",
+          kind: "order.delivered",
+          payload: { orderId: "order-test" },
+          createdAt: "2026-11-12T20:00:00Z",
+          read: true,
+        },
+        {
+          id: "notice-unread",
+          kind: "order.accepted",
+          payload: { orderId: "order-test" },
+          createdAt: "2026-11-12T21:00:00Z",
+          read: false,
+        },
+      ]);
+    if (path.includes("/notifications/") && path.endsWith("/read")) {
+      noticeReadWrites++;
+      return Response.json({ ok: true });
+    }
+    if (path.endsWith("/orders/order-test"))
+      return Response.json({
+        id: "order-test",
+        status: "delivered",
+        paymentStatus: "paid",
+        paymentMethod: "cash",
+        clientName: "Cliente de prueba",
+        clientReference: "",
+        createdAt: "2026-11-12T20:00:00Z",
+        channel: "pos",
+        totalCop: 1000,
+        lines: [],
+      });
+
     if (
       [
         "/orders",
@@ -178,6 +214,40 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
       await waitFor(() =>
         assert.ok(view.getByRole("button", { name: "+ Agregar" })),
       );
+      if (role === "admin") {
+        fireEvent.click(view.getByRole("button", { name: "Notificaciones" }));
+        const noticeDialog = view.getByRole("dialog", {
+          name: "Notificaciones",
+        });
+        const read = within(noticeDialog).getByRole("article", {
+          name: "Pedido: leída",
+        });
+        const unread = within(noticeDialog).getByRole("article", {
+          name: "Pedido: sin leer",
+        });
+        assert.ok(read.classList.contains("read"));
+        assert.ok(unread.classList.contains("unread"));
+        assert.equal(within(noticeDialog).queryByText(/^Leída$/), null);
+        assert.equal(
+          within(noticeDialog).queryByText("Ver pedido y acciones"),
+          null,
+        );
+        fireEvent.click(
+          within(unread).getByRole("button", {
+            name: "Ver detalle: Pedido · Aceptado",
+          }),
+        );
+        await waitFor(() =>
+          assert.ok(view.getByRole("dialog", { name: "Pedido order-te" })),
+        );
+        assert.equal(noticeReadWrites, 1);
+        fireEvent.click(
+          within(view.getByRole("dialog")).getByRole("button", {
+            name: "× Cerrar",
+          }),
+        );
+        fireEvent.click(view.getByRole("button", { name: "Caja" }));
+      }
       assert.equal(view.queryByLabelText("Categoría"), null);
       assert.equal(view.queryByText("RECOGIDA EN TIENDA · COP"), null);
       const readsBeforePull = inventoryReads;
