@@ -1,6 +1,6 @@
 import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { openNativeOutbox, type Outbox } from "@playita/mobile";
 import { native, auth } from "./session.js";
 import { Button, Input, Select } from "./material.js";
@@ -129,15 +129,21 @@ export function Checkout({
   const current = draft || localDraft,
     { clientId, received } = current,
     update = onDraftChange || setLocalDraft;
+  const clientsLoading = useRef(false);
   async function loadClients() {
+    if (clientsLoading.current) return;
+    clientsLoading.current = true;
     setLoading(true);
     try {
       const list = await get(owner, "/credit/clients");
       setClients(Array.isArray(list) ? list : []);
       setError("");
     } catch {
-      setError("No se pudieron consultar cuentas. Pulsa Actualizar cuentas.");
+      setError(
+        "No se pudieron consultar cuentas. Vuelve a abrir el selector para reintentar.",
+      );
     } finally {
+      clientsLoading.current = false;
       setLoading(false);
     }
   }
@@ -208,7 +214,10 @@ export function Checkout({
           }}
           getOptionLabel={(option) => option.name}
           isOptionEqualToValue={(option, value) => option.id === value.id}
-          disabled={busy || !!attempt || loading}
+          disabled={busy || !!attempt}
+          onOpen={() => void loadClients()}
+          loading={loading}
+          loadingText="Actualizando cuentas…"
           onChange={(_event, selected) => {
             setClientSearch(selected?.id ? selected.name : "");
             update({ ...current, clientId: selected?.id || "" });
@@ -242,13 +251,6 @@ export function Checkout({
           }}
         />
       </div>
-      <Button
-        type="button"
-        disabled={busy || loading || !!attempt}
-        onClick={() => void loadClients()}
-      >
-        {loading ? "Cargando cuentas…" : "Actualizar cuentas"}
-      </Button>
       <label>
         Efectivo recibido (COP)
         <Input
@@ -376,9 +378,11 @@ export function Checkout({
 export function Credits({
   owner,
   onChange,
+  refreshToken = 0,
 }: {
   owner: string;
   onChange: (saleRecovered?: boolean) => Promise<void>;
+  refreshToken?: number;
 }) {
   const [clients, setClients] = useState<any[]>([]),
     [search, setSearch] = useState(""),
@@ -395,7 +399,7 @@ export function Credits({
   }
   useEffect(() => {
     void load().catch((e) => setMessage(e.message));
-  }, [owner]);
+  }, [owner, refreshToken]);
   async function mutate(path: string, payload: unknown, after?: () => void) {
     setBusy(true);
     setMessage("");
@@ -606,9 +610,11 @@ export function Credits({
 export function BuyerProfile({
   owner,
   guest,
+  refreshToken = 0,
 }: {
   owner: string;
   guest: boolean;
+  refreshToken?: number;
 }) {
   const [profile, setProfile] = useState<any>(null),
     [orders, setOrders] = useState<any[]>([]),
@@ -628,7 +634,7 @@ export function BuyerProfile({
   }
   useEffect(() => {
     if (!guest) void load();
-  }, [owner, guest]);
+  }, [owner, guest, refreshToken]);
   if (guest)
     return (
       <section className="panel">

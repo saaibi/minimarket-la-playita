@@ -78,10 +78,12 @@ test("Canasta: pago más abono muestra reparto y confirma una sola solicitud", a
     { Checkout } = await import("../apps/web/src/credit.js");
   const original = auth.request,
     requests: any[] = [];
-  let saved = false;
+  let saved = false,
+    accountReads = 0;
   const clientId = crypto.randomUUID();
   auth.request = async (path, init) => {
-    if (!init?.method)
+    if (!init?.method) {
+      accountReads++;
       return Response.json([
         {
           id: clientId,
@@ -91,6 +93,7 @@ test("Canasta: pago más abono muestra reparto y confirma una sola solicitud", a
           balanceCop: 5000,
         },
       ]);
+    }
     requests.push({ path, body: JSON.parse(String(init.body)) });
     return Response.json({ id: "sale" }, { status: 201 });
   };
@@ -119,6 +122,10 @@ test("Canasta: pago más abono muestra reparto y confirma una sola solicitud", a
       ),
     );
 
+    assert.equal(
+      view.queryByRole("button", { name: "Actualizar cuentas" }),
+      null,
+    );
     fireEvent.mouseDown(view.getByRole("combobox"));
     await waitFor(() =>
       assert.ok(view.getByRole("option", { name: /cliente@example.invalid/ })),
@@ -146,6 +153,7 @@ test("Canasta: pago más abono muestra reparto y confirma una sola solicitud", a
       await view.findByRole("option", { name: /cliente@example.invalid/ }),
     );
     assert.notEqual(document.activeElement, clientInput);
+    await waitFor(() => assert.ok(accountReads >= 2));
     fireEvent.change(view.getByLabelText("Efectivo recibido (COP)"), {
       target: { value: "10000" },
     });

@@ -1456,3 +1456,122 @@ label .MuiInputBase-root {
   margin: 12px 0;
   font-size: 1.5rem;
 }
+
+/* Compact catalogue tiles: two per row on phones, adapting to enlarged text. */
+.product-grid.cards {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
+  gap: 12px;
+}
+.product-grid .product-card {
+  padding: 10px;
+  min-width: 0;
+}
+.product-grid .product-art,
+.product-grid .product-art.has-photo {
+  height: 105px;
+  margin-bottom: 6px;
+  border-radius: 9px;
+}
+.product-grid .product-card h3 {
+  font-size: 0.95rem;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  margin: 5px 0;
+}
+.product-grid .product-card > small {
+  font-size: 0.7rem;
+  line-height: 1.35;
+  display: block;
+}
+.product-grid .product-card .tag {
+  font-size: 0.6rem;
+  padding: 2px 5px;
+}
+.product-grid .product-card .price {
+  font-size: 1.15rem;
+  margin: 7px 0;
+}
+.product-grid .product-card .price small {
+  font-size: 0.7rem;
+}
+.product-grid .buyline {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+.product-grid .product-card label {
+  font-size: 0.7rem;
+  margin: 2px 0;
+  gap: 2px;
+}
+.product-grid .MuiInputBase-root {
+  font-size: 0.8rem;
+}
+.product-grid .MuiInputBase-input {
+  padding: 8px;
+}
+.product-grid .MuiInputBase-root select.MuiNativeSelect-select {
+  font-size: 0.75rem;
+  padding: 7px 28px 7px 8px;
+  line-height: 24px;
+  min-height: 24px;
+}
+.product-grid .product-card .primary {
+  min-height: 40px;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  padding: 6px;
+}
+.product-grid .product-description {
+  max-height: 2.7em;
+  overflow: auto;
+}
+.stock-label-compact {
+  display: none;
+}
+@media (max-width: 600px) {
+  .product-grid.cards {
+    gap: 10px;
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(min(100%, max(9rem, calc(50% - 5px))), 1fr)
+    );
+  }
+  .product-grid .product-card {
+    padding: 8px;
+  }
+  .product-grid .product-art,
+  .product-grid .product-art.has-photo {
+    height: 90px;
+  }
+  .product-grid .product-card h3 {
+    font-size: 0.9rem;
+  }
+  .product-grid .product-card .tag,
+  .product-grid .product-card .product-category {
+    display: none;
+  }
+  .product-grid .stock-label {
+    display: none;
+  }
+  .product-grid .stock-label-compact {
+    display: inline;
+  }
+}
+
+.product-search.toolbar {
+  grid-template-columns: minmax(0, 1fr);
+}
+.pull-refresh-status {
+  text-align: center;
+  margin: 4px 0 10px;
+  color: var(--green);
+  font-size: 0.8rem;
+}
+@media (max-width: 600px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .stats .sales-total-stat {
+    grid-column: 1 / -1;
+  }
+}

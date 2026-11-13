@@ -1,3 +1,4 @@
+import { usePullRefresh } from "./pull-refresh.js";
 import { remainingStock, assertCartAddition } from "./cart-stock.js";
 import { Credits, Checkout, BuyerProfile } from "./credit.js";
 import Chip from "@mui/material/Chip";
@@ -91,7 +92,6 @@ export function Shop() {
     [clients, setClients] = useState<
       { id: string; name: string; contact: string }[]
     >([]),
-    [category, setCategory] = useState("all"),
     [payment, setPayment] = useState<"cash" | "nequi">("cash"),
     [rows, setRows] = useState<OutboxRow[]>([]),
     [message, setMessage] = useState("Consultando la tienda…"),
@@ -135,6 +135,32 @@ export function Shop() {
   }, [session.actor.id, session.mode, staff]);
   const cartSnapshot = useRef(cart);
   cartSnapshot.current = cart;
+  useEffect(() => {
+    if (message !== "Información actualizada de la tienda") return;
+    const timer = setTimeout(
+      () =>
+        setMessage((current) =>
+          current === "Información actualizada de la tienda" ? "" : current,
+        ),
+      3500,
+    );
+    return () => clearTimeout(timer);
+  }, [message]);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const pullRefresh = usePullRefresh(
+    async () => {
+      try {
+        await reload();
+        setRefreshToken((token) => token + 1);
+        setMessage("Información actualizada de la tienda");
+      } catch {
+        setMessage(
+          "No se pudo actualizar. Revisa la conexión e inténtalo de nuevo.",
+        );
+      }
+    },
+    busy || cartOpen || bellOpen || !!selected || pendingSale,
+  );
   const box = useRef<Outbox | null>(null),
     worker = useRef<Synchronizer | null>(null),
     webAttempt = useRef<{ key: string; payload: string; route: string } | null>(
@@ -768,7 +794,6 @@ export function Shop() {
               <Button onClick={() => void logout()}>Salir</Button>
             </div>
           </header>
-          <div className="environment-banner">RECOGIDA EN TIENDA · COP</div>
           {cart.length > 0 && (
             <div className="cart-dock">
               <span>
@@ -780,9 +805,20 @@ export function Shop() {
           )}
         </div>
         <main>
-          <p className="status" role="status">
-            {message}
-          </p>
+          {(pullRefresh.distance > 0 || pullRefresh.refreshing) && (
+            <p className="pull-refresh-status" role="status">
+              {pullRefresh.refreshing
+                ? "Actualizando listado…"
+                : pullRefresh.distance >= 80
+                  ? "Suelta para actualizar"
+                  : "Desliza hacia abajo para actualizar"}
+            </p>
+          )}
+          {message && (
+            <p className="status" role="status">
+              {message}
+            </p>
+          )}
           {session.mode === "offline" && (
             <p className="notice">
               Sesión local sin autenticar. Conserva tu cuenta y vuelve a
@@ -808,74 +844,44 @@ export function Shop() {
           )}
           {(view === "catalog" || view === "pos") && (
             <>
-              <section className={view === "catalog" ? "intro hero" : "intro"}>
-                <p className="eyebrow">DEL CAMPO A TU MESA</p>
-                <h1>
-                  {view === "pos" ? (
-                    "Una venta, bien hecha"
-                  ) : (
-                    <>
-                      Lo de siempre,
-                      <br />
-                      más cerca de ti.
-                    </>
-                  )}
-                </h1>
-                <p>
-                  {view === "pos"
-                    ? "Agrega productos y registra pagos, créditos o abonos desde la canasta."
-                    : "Elige tus productos y recógelos en La Playita."}
-                </p>
-                <small>Precios en COP</small>
-                {view === "catalog" && (
+              {view === "catalog" && (
+                <section className="intro hero">
+                  <p className="eyebrow">DEL CAMPO A TU MESA</p>
+                  <h1>
+                    Lo de siempre,
+                    <br />
+                    más cerca de ti.
+                  </h1>
+                  <p>Elige tus productos y recógelos en La Playita.</p>
+                  <small>Precios en COP</small>
                   <img
                     className="store-photo"
                     src="/assets/tienda.jpg"
                     alt="La tienda La Playita"
                   />
-                )}
-              </section>
-              <div className="toolbar">
+                </section>
+              )}
+              <div className="toolbar product-search">
                 <Input
                   aria-label="Buscar productos"
                   placeholder="Buscar producto o código…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
-                <Select
-                  aria-label="Categoría"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                >
-                  <option value="all">Todas las categorías</option>
-                  {[
-                    ...new Set(products.map((p) => p.category || "Despensa")),
-                  ].map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
-                </Select>
-                {view !== "pos" && (
-                  <Button onClick={() => setCartOpen(true)}>
-                    Canasta · {money(total)}
-                  </Button>
-                )}
               </div>
-              <div className="cards">
+              <div className="cards product-grid">
                 {products
-                  .filter(
-                    (p) =>
-                      (p.name + " " + (p.code || ""))
-                        .normalize("NFD")
-                        .replace(/\p{Diacritic}/gu, "")
-                        .toLocaleLowerCase()
-                        .includes(
-                          search
-                            .normalize("NFD")
-                            .replace(/\p{Diacritic}/gu, "")
-                            .toLocaleLowerCase(),
-                        ) &&
-                      (category === "all" ||
-                        (p.category || "Despensa") === category),
+                  .filter((p) =>
+                    (p.name + " " + (p.code || ""))
+                      .normalize("NFD")
+                      .replace(/\p{Diacritic}/gu, "")
+                      .toLocaleLowerCase()
+                      .includes(
+                        search
+                          .normalize("NFD")
+                          .replace(/\p{Diacritic}/gu, "")
+                          .toLocaleLowerCase(),
+                      ),
                   )
                   .map((p) => (
                     <ProductCard
@@ -903,12 +909,14 @@ export function Shop() {
           )}
           {view === "profile" && !staff && ownCreditEnabled && (
             <BuyerProfile
+              refreshToken={refreshToken}
               owner={session.actor.id}
               guest={!!session.actor.guest}
             />
           )}
           {view === "credit" && staff && (
             <Credits
+              refreshToken={refreshToken}
               owner={session.actor.id}
               onChange={async (saleRecovered) => {
                 if (saleRecovered) {
@@ -1357,12 +1365,15 @@ export function ProductCard({
       <span className="tag">
         {p.kind === "weight" ? "Por peso" : "Por presentación"}
       </span>
-      <h3>{p.name}</h3>
-      <small>{p.category || "Despensa"}</small>
-      {p.description && <small>{p.description}</small>}
+      <h3 title={p.name}>{p.name}</h3>
+      <small className="product-category">{p.category || "Despensa"}</small>
+      {p.description && (
+        <small className="product-description">{p.description}</small>
+      )}
       <small>
-        Disponible para agregar: {remaining}{" "}
-        {p.kind === "weight" ? "g" : "unidades base"}
+        <span className="stock-label">Disponible para agregar: </span>
+        <span className="stock-label-compact">Quedan: </span>
+        {remaining} {p.kind === "weight" ? "g" : "unidades base"}
       </small>
       <p className="price">
         {money(
@@ -1409,7 +1420,7 @@ export function ProductCard({
             >
               {p.presentations.map((v) => (
                 <option key={v.id} value={v.id}>
-                  {v.name} · {money(v.priceCop)}
+                  {v.name}
                 </option>
               ))}
             </Select>

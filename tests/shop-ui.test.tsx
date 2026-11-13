@@ -57,6 +57,7 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
     overrideDate: "2000-01-01",
     version: 0,
   };
+  let inventoryReads = 0;
   globalThis.fetch = async (input, init) => {
     const path = String(input);
     if (path.endsWith("/auth/login") || path.endsWith("/auth/guest"))
@@ -69,10 +70,12 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
         },
         accessExpiresAt: Date.now() + 300000,
       });
-    if (path.endsWith("/inventory"))
+    if (path.endsWith("/inventory")) {
+      inventoryReads++;
       return Response.json([
         { ...product, ...(role === "admin" ? {} : { costCop: undefined }) },
       ]);
+    }
     if (path.endsWith("/settings")) return Response.json(settings);
     if (
       [
@@ -143,6 +146,10 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
         );
         fireEvent.click(view.getByRole("button", { name: "Caja" }));
       }
+      if (role !== "buyer") {
+        assert.equal(view.queryByText("Una venta, bien hecha"), null);
+        assert.equal(view.queryByText("DEL CAMPO A TU MESA"), null);
+      }
       if (role === "seller") {
         assert.ok(view.getByRole("button", { name: "Ajustes" }));
         assert.equal(
@@ -171,6 +178,19 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
       await waitFor(() =>
         assert.ok(view.getByRole("button", { name: "+ Agregar" })),
       );
+      assert.equal(view.queryByLabelText("Categoría"), null);
+      assert.equal(view.queryByText("RECOGIDA EN TIENDA · COP"), null);
+      const readsBeforePull = inventoryReads;
+      fireEvent.touchStart(view.container, {
+        touches: [{ clientX: 100, clientY: 20 }],
+      });
+      fireEvent.touchMove(view.container, {
+        touches: [{ clientX: 100, clientY: 120 }],
+      });
+      assert.ok(view.getByText("Suelta para actualizar"));
+      fireEvent.touchEnd(view.container, { touches: [] });
+      await waitFor(() => assert.ok(inventoryReads > readsBeforePull));
+
       fireEvent.click(view.getByRole("button", { name: "+ Agregar" }));
       if (role !== "buyer") {
         assert.ok(view.getByLabelText("Ver canasta"));

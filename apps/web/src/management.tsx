@@ -104,7 +104,10 @@ export function Inventory({
         <Button className="stat" onClick={() => onNavigate("orders")}>
           Pedidos por entregar<b>{ordersCount}</b>
         </Button>
-        <Button className="stat" onClick={() => onNavigate("history")}>
+        <Button
+          className="stat sales-total-stat"
+          onClick={() => onNavigate("history")}
+        >
           Ventas registradas<b>{money(salesTotal)}</b>
         </Button>
       </div>
