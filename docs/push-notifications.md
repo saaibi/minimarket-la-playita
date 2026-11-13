@@ -1,6 +1,6 @@
 # Push de La Playita: revisión de integración
 
-Estado: integración local implementada, pendiente de activar Firebase y cargar las credenciales. No se han emitido credenciales ni enviado notificaciones push reales. La API incorpora registro por cuenta/familia de sesión, cola persistente, reintentos y descarte de tokens inválidos. Android incorpora permiso voluntario, desvinculación al salir y apertura autenticada del pedido. La configuración cloud espera aceptación de condiciones del propietario.
+Estado: integración implementada y validada en CI con PostgreSQL. Firebase está habilitado en el proyecto existente, plan Spark sin facturación; la app Android está registrada y su configuración cliente está descargada. Falta autorizar la creación y almacenamiento de la credencial privada de envío en Render, desplegar y comprobar en un teléfono. No se han emitido credenciales ni enviado notificaciones push reales. La API incorpora registro por cuenta/familia de sesión, cola persistente, reintentos y descarte de tokens inválidos. Android incorpora permiso voluntario, desvinculación al salir y apertura autenticada del pedido. Las condiciones de Firebase fueron aceptadas con autorización del propietario; Analytics permanece desactivado.
 
 ## Primera etapa: Android
 
