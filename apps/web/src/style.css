@@ -1680,3 +1680,18 @@ label .MuiInputBase-root {
   color: var(--blue);
   border-color: #b9cbd4;
 }
+
+.phone-notifications {
+  margin: 0 0 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.phone-notifications p {
+  font-size: 0.85rem;
+  margin: 0 0 6px;
+}
+.phone-notifications small {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.75rem;
+}

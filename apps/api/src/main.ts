@@ -1,3 +1,4 @@
+import { firebasePushSender } from "./push.js";
 import { createApp } from "./app.js";
 try {
   process.loadEnvFile(new URL("../../../.env", import.meta.url));
@@ -22,6 +23,7 @@ const googleVerifier = process.env.GOOGLE_WEB_CLIENT_ID
   : undefined;
 const server = await createApp({
   googleVerifier,
+  pushSender: firebasePushSender(),
   databaseUrl,
   production: process.env.NODE_ENV === "production",
   origins: process.env.CORS_ORIGINS?.split(",")

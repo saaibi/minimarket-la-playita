@@ -1,3 +1,4 @@
+import { PushService, type PushSender } from "./push.js";
 import "reflect-metadata";
 import {
   Controller,
@@ -33,18 +34,26 @@ import { type VerificationProvider } from "./verification.js";
 import type { GoogleVerifier } from "./google.js";
 import { json } from "express";
 const STORE = "STORE";
-type Request = { actor: Actor; headers: Record<string, string | undefined> };
+const PUSH = "PUSH";
+type Request = {
+  actor: Actor;
+  headers: Record<string, string | undefined>;
+  session: { family: string; guest: boolean; client: string };
+};
 function key(req: Request) {
   return z.uuid().safeParse(req.headers["idempotency-key"]);
 }
 @Controller()
 class ApiController {
-  constructor(@Inject(STORE) private readonly store: Store) {}
+  constructor(
+    @Inject(STORE) private readonly store: Store,
+    @Inject(PUSH) private readonly push: PushService,
+  ) {}
   @Get("health") async health() {
     try {
       const healthQuery = {
         text: "SELECT version FROM schema_migrations WHERE version = $1",
-        values: ["009_order_customer_link.sql"],
+        values: ["010_push_notifications.sql"],
         query_timeout: 2500,
       };
       const result = await this.store.pool.query(healthQuery);
@@ -53,6 +62,66 @@ class ApiController {
     } catch {
       throw new ServiceUnavailableException({ status: "not_ready" });
     }
+  }
+  @Get("push/options") pushOptions() {
+    return { available: this.push.available, platform: "android" };
+  }
+  @Post("push/devices") async registerPush(
+    @Req() req: Request,
+    @Body() body: unknown,
+    @Res() res: any,
+  ) {
+    if (req.session.guest || req.session.client !== "native")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    if (!this.push.available)
+      return res.status(503).json({ code: "PUSH_UNAVAILABLE" });
+    const input = z
+      .object({
+        installationId: z.uuid(),
+        token: z
+          .string()
+          .min(20)
+          .max(4096)
+          .refine((v) => !/[\s\x00-\x1f]/.test(v)),
+      })
+      .strict()
+      .safeParse(body);
+    if (!input.success)
+      return res.status(400).json({ code: "VALIDATION_ERROR" });
+    try {
+      await this.push.register(
+        req.actor.id,
+        req.session.family,
+        input.data.installationId,
+        input.data.token,
+      );
+      return res.json({ ok: true });
+    } catch (e: any) {
+      if (e.message === "DEVICE_LIMIT")
+        return res.status(429).json({ code: "DEVICE_LIMIT" });
+      if (e.message === "ACCOUNT_NOT_ALLOWED")
+        return res.status(403).json({ code: "FORBIDDEN" });
+      // A database uniqueness error can contain the token. Never expose/log it.
+      return res.status(503).json({ code: "PUSH_REGISTRATION_FAILED" });
+    }
+  }
+  @Post("push/devices/unregister") async unregisterPush(
+    @Req() req: Request,
+    @Body() body: unknown,
+    @Res() res: any,
+  ) {
+    const input = z
+      .object({ installationId: z.uuid() })
+      .strict()
+      .safeParse(body);
+    if (!input.success)
+      return res.status(400).json({ code: "VALIDATION_ERROR" });
+    await this.push.unregister(
+      req.actor.id,
+      req.session.family,
+      input.data.installationId,
+    );
+    return res.json({ ok: true });
   }
   @Get("inventory") inventory(@Req() req: Request) {
     return this.store.inventory(req.actor);
@@ -470,6 +539,8 @@ export async function createApp(config: {
   verificationProvider?: VerificationProvider;
   googleVerifier?: GoogleVerifier;
   origins?: string[];
+  pushSender?: PushSender;
+  autoPush?: boolean;
 }) {
   const pool = new Pool(databaseOptions(config.databaseUrl));
   try {
@@ -478,6 +549,7 @@ export async function createApp(config: {
     await pool.end();
     throw e;
   }
+  const push = new PushService(pool, config.pushSender);
   let io: Server | undefined;
   const store = new Store(pool, (events) => {
     for (const event of events) {
@@ -489,7 +561,10 @@ export async function createApp(config: {
   });
   @Module({
     controllers: [ApiController],
-    providers: [{ provide: STORE, useValue: store }],
+    providers: [
+      { provide: STORE, useValue: store },
+      { provide: PUSH, useValue: push },
+    ],
   })
   class AppModule {}
   const app = await NestFactory.create(AppModule, {
@@ -531,6 +606,7 @@ export async function createApp(config: {
     try {
       const session = await auth.protect(req);
       req.actor = session.actor;
+      req.session = session;
       next();
     } catch (e) {
       return res
@@ -590,13 +666,16 @@ export async function createApp(config: {
     });
   });
   await app.init();
+  if (config.autoPush !== false) push.start();
   return {
     app,
     pool,
     store,
+    push,
     auth,
     io,
     close: async () => {
+      await push.stop();
       io?.disconnectSockets(true);
       await app.close();
       await pool.end();

@@ -21,3 +21,7 @@ coverage/
 .DS_Store
 # Private store photograph is supplied locally for the owner build, never public Git.
 apps/web/public/assets/tienda.jpg
+
+# Firebase private server credentials and local Android configuration
+**/firebase-service-account*.json
+**/google-services.json

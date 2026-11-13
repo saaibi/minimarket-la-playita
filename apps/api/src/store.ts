@@ -1,3 +1,4 @@
+import { enqueuePush } from "./push.js";
 import { randomUUID, createHash } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import {
@@ -166,6 +167,7 @@ export class Store {
         [kind, owner, JSON.stringify(payload)],
       )
     ).rows[0];
+    await enqueuePush(db, e);
     events.push(e);
   }
   create(
@@ -1145,7 +1147,7 @@ export class Store {
   async notifications(actor: Actor) {
     const rows = (
       await this.pool.query(
-        `SELECT e.id::text,e.kind,e.payload,e.created_at AS "createdAt",(r.event_id IS NOT NULL) AS read FROM events e LEFT JOIN notification_reads r ON r.event_id=e.id AND r.user_id=$1 WHERE e.kind LIKE 'order.%' ${actor.role === "buyer" ? "AND e.owner_id=$1" : ""} ORDER BY e.id DESC LIMIT 100`,
+        `SELECT e.id::text,e.kind,e.payload,e.created_at AS "createdAt",(r.event_id IS NOT NULL) AS read FROM events e LEFT JOIN notification_reads r ON r.event_id=e.id AND r.user_id=$1 WHERE e.kind LIKE 'order.%' ${actor.role === "buyer" ? "AND (e.owner_id=$1 OR EXISTS(SELECT 1 FROM orders o WHERE o.id::text=e.payload->>'orderId' AND o.customer_id::text=$1))" : ""} ORDER BY e.id DESC LIMIT 100`,
         [actor.id],
       )
     ).rows;
@@ -1170,7 +1172,7 @@ export class Store {
       );
     } else
       await this.pool.query(
-        `INSERT INTO notification_reads(user_id,event_id) SELECT $1,id FROM events WHERE id=$2 ${actor.role === "buyer" ? "AND owner_id=$1" : ""} ON CONFLICT DO NOTHING`,
+        `INSERT INTO notification_reads(user_id,event_id) SELECT $1,e.id FROM events e WHERE e.id=$2 ${actor.role === "buyer" ? "AND (e.owner_id=$1 OR EXISTS(SELECT 1 FROM orders o WHERE o.id::text=e.payload->>'orderId' AND o.customer_id::text=$1))" : ""} ON CONFLICT DO NOTHING`,
         [actor.id, id],
       );
     return { ok: true };

@@ -121,7 +121,10 @@
                   },
                   "kind": {
                     "type": "string",
-                    "enum": ["unit", "weight"]
+                    "enum": [
+                      "unit",
+                      "weight"
+                    ]
                   },
                   "priceCop": {
                     "type": "integer",
@@ -178,7 +181,11 @@
                           "maximum": 100000000
                         }
                       },
-                      "required": ["name", "factor", "priceCop"],
+                      "required": [
+                        "name",
+                        "factor",
+                        "priceCop"
+                      ],
                       "additionalProperties": false
                     }
                   }
@@ -405,10 +412,18 @@
                 "properties": {
                   "action": {
                     "type": "string",
-                    "enum": ["accept", "ready", "pay_cash", "deliver", "cancel"]
+                    "enum": [
+                      "accept",
+                      "ready",
+                      "pay_cash",
+                      "deliver",
+                      "cancel"
+                    ]
                   }
                 },
-                "required": ["action"],
+                "required": [
+                  "action"
+                ],
                 "additionalProperties": false
               }
             }
@@ -530,7 +545,10 @@
                     "maxLength": 128
                   }
                 },
-                "required": ["email", "password"]
+                "required": [
+                  "email",
+                  "password"
+                ]
               }
             }
           }
@@ -894,7 +912,10 @@
                     "maxLength": 100
                   }
                 },
-                "required": ["challengeId", "credential"]
+                "required": [
+                  "challengeId",
+                  "credential"
+                ]
               }
             }
           }
@@ -1015,10 +1036,17 @@
                     "maxLength": 128
                   },
                   "role": {
-                    "enum": ["admin", "seller"]
+                    "enum": [
+                      "admin",
+                      "seller"
+                    ]
                   }
                 },
-                "required": ["email", "password", "role"]
+                "required": [
+                  "email",
+                  "password",
+                  "role"
+                ]
               }
             }
           }
@@ -1138,7 +1166,9 @@
                     "pattern": "^\\+[1-9]\\d{7,14}$"
                   }
                 },
-                "required": ["phone"]
+                "required": [
+                  "phone"
+                ]
               }
             }
           }
@@ -1189,7 +1219,10 @@
                     "type": "string"
                   }
                 },
-                "required": ["challengeId", "code"]
+                "required": [
+                  "challengeId",
+                  "code"
+                ]
               }
             }
           }
@@ -1304,7 +1337,10 @@
                   },
                   "kind": {
                     "type": "string",
-                    "enum": ["unit", "weight"]
+                    "enum": [
+                      "unit",
+                      "weight"
+                    ]
                   },
                   "priceCop": {
                     "type": "integer",
@@ -1361,7 +1397,11 @@
                           "maximum": 100000000
                         }
                       },
-                      "required": ["name", "factor", "priceCop"],
+                      "required": [
+                        "name",
+                        "factor",
+                        "priceCop"
+                      ],
                       "additionalProperties": false
                     }
                   }
@@ -1481,12 +1521,19 @@
                           "maximum": 100000000
                         }
                       },
-                      "required": ["id", "priceCop"],
+                      "required": [
+                        "id",
+                        "priceCop"
+                      ],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": ["delta", "reason", "version"],
+                "required": [
+                  "delta",
+                  "reason",
+                  "version"
+                ],
                 "additionalProperties": false
               }
             }
@@ -1569,13 +1616,20 @@
                           "maximum": 100000000
                         }
                       },
-                      "required": ["productId", "quantity", "expectedPriceCop"],
+                      "required": [
+                        "productId",
+                        "quantity",
+                        "expectedPriceCop"
+                      ],
                       "additionalProperties": false
                     }
                   },
                   "paymentMethod": {
                     "type": "string",
-                    "enum": ["cash", "nequi"]
+                    "enum": [
+                      "cash",
+                      "nequi"
+                    ]
                   },
                   "client": {
                     "type": "object",
@@ -1590,7 +1644,9 @@
                         "maxLength": 100
                       }
                     },
-                    "required": ["name"],
+                    "required": [
+                      "name"
+                    ],
                     "additionalProperties": false
                   },
                   "cashReceived": {
@@ -1599,7 +1655,11 @@
                     "maximum": 2000000000
                   }
                 },
-                "required": ["lines", "paymentMethod", "cashReceived"],
+                "required": [
+                  "lines",
+                  "paymentMethod",
+                  "cashReceived"
+                ],
                 "additionalProperties": false
               }
             }
@@ -1687,13 +1747,21 @@
                           "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
                         }
                       },
-                      "required": ["closed", "open", "close"],
+                      "required": [
+                        "closed",
+                        "open",
+                        "close"
+                      ],
                       "additionalProperties": false
                     }
                   },
                   "override": {
                     "type": "string",
-                    "enum": ["auto", "open", "closed"]
+                    "enum": [
+                      "auto",
+                      "open",
+                      "closed"
+                    ]
                   },
                   "overrideDate": {
                     "type": "string",
@@ -1705,7 +1773,12 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": ["days", "override", "overrideDate", "version"],
+                "required": [
+                  "days",
+                  "override",
+                  "overrideDate",
+                  "version"
+                ],
                 "additionalProperties": false
               }
             }
@@ -1844,7 +1917,10 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": ["name", "contact"],
+                "required": [
+                  "name",
+                  "contact"
+                ],
                 "additionalProperties": false
               }
             }
@@ -1913,7 +1989,10 @@
                     "maximum": 9007199254740991
                   }
                 },
-                "required": ["name", "contact"],
+                "required": [
+                  "name",
+                  "contact"
+                ],
                 "additionalProperties": false
               }
             }
@@ -1956,14 +2035,21 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["email", "role"],
+                "required": [
+                  "email",
+                  "role"
+                ],
                 "properties": {
                   "email": {
                     "type": "string",
                     "format": "email"
                   },
                   "role": {
-                    "enum": ["admin", "seller", "buyer"]
+                    "enum": [
+                      "admin",
+                      "seller",
+                      "buyer"
+                    ]
                   },
                   "creditEnabled": {
                     "type": "boolean",
@@ -2039,7 +2125,10 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["removed", "reason"],
+                "required": [
+                  "removed",
+                  "reason"
+                ],
                 "properties": {
                   "removed": {
                     "type": "boolean"
@@ -2163,7 +2252,11 @@
                           "maximum": 100000000
                         }
                       },
-                      "required": ["productId", "quantity", "expectedPriceCop"],
+                      "required": [
+                        "productId",
+                        "quantity",
+                        "expectedPriceCop"
+                      ],
                       "additionalProperties": false
                     }
                   },
@@ -2172,7 +2265,10 @@
                     "format": "uuid"
                   }
                 },
-                "required": ["lines", "clientId"]
+                "required": [
+                  "lines",
+                  "clientId"
+                ]
               }
             }
           }
@@ -2246,7 +2342,11 @@
                           "maximum": 100000000
                         }
                       },
-                      "required": ["productId", "quantity", "expectedPriceCop"],
+                      "required": [
+                        "productId",
+                        "quantity",
+                        "expectedPriceCop"
+                      ],
                       "additionalProperties": false
                     }
                   },
@@ -2255,7 +2355,12 @@
                     "format": "uuid"
                   },
                   "mode": {
-                    "enum": ["auto", "cash", "credit", "cash_and_payment"],
+                    "enum": [
+                      "auto",
+                      "cash",
+                      "credit",
+                      "cash_and_payment"
+                    ],
                     "default": "auto",
                     "description": "auto para interfaz única; otros modos solo para compatibilidad de intentos anteriores."
                   },
@@ -2285,21 +2390,34 @@
                     "description": "Permiso mostrado al confirmar. Si cambia bajo bloqueo, se rechaza para revisar."
                   }
                 },
-                "required": ["lines"],
+                "required": [
+                  "lines"
+                ],
                 "oneOf": [
                   {
-                    "required": ["cashReceived", "expectedTotalCop"],
+                    "required": [
+                      "cashReceived",
+                      "expectedTotalCop"
+                    ],
                     "properties": {
                       "mode": {
-                        "enum": ["auto"]
+                        "enum": [
+                          "auto"
+                        ]
                       }
                     }
                   },
                   {
-                    "required": ["mode"],
+                    "required": [
+                      "mode"
+                    ],
                     "properties": {
                       "mode": {
-                        "enum": ["cash", "credit", "cash_and_payment"]
+                        "enum": [
+                          "cash",
+                          "credit",
+                          "cash_and_payment"
+                        ]
                       }
                     }
                   }
@@ -2364,7 +2482,9 @@
                     "maximum": 2000000000
                   }
                 },
-                "required": ["amountCop"]
+                "required": [
+                  "amountCop"
+                ]
               }
             }
           }
@@ -2409,7 +2529,9 @@
               "schema": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["creditEnabled"],
+                "required": [
+                  "creditEnabled"
+                ],
                 "properties": {
                   "creditEnabled": {
                     "type": "boolean"
@@ -2453,6 +2575,94 @@
           },
           "404": {
             "description": "Cuenta registrada requerida"
+          }
+        }
+      }
+    },
+    "/push/options": {
+      "get": {
+        "summary": "Disponibilidad de avisos push Android para sesiones autenticadas",
+        "responses": {
+          "200": {
+            "description": "available boolean; platform android"
+          }
+        }
+      }
+    },
+    "/push/devices": {
+      "post": {
+        "summary": "Registrar token de esta instalación para el usuario y familia de sesión nativa actuales; invitados rechazados",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "installationId",
+                  "token"
+                ],
+                "properties": {
+                  "installationId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "token": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 4096
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Registro actualizado"
+          },
+          "400": {
+            "description": "Solicitud inválida"
+          },
+          "403": {
+            "description": "Solo cuentas registradas en sesión nativa"
+          },
+          "429": {
+            "description": "Máximo diez instalaciones activas"
+          },
+          "503": {
+            "description": "Push no configurado"
+          }
+        }
+      }
+    },
+    "/push/devices/unregister": {
+      "post": {
+        "summary": "Desactivar instalación vinculada a la cuenta y familia de sesión actuales",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "installationId"
+                ],
+                "properties": {
+                  "installationId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Desactivado o sin vínculo propio; nunca modifica otra cuenta"
           }
         }
       }
@@ -2503,13 +2713,20 @@
                   "maximum": 100000000
                 }
               },
-              "required": ["productId", "quantity", "expectedPriceCop"],
+              "required": [
+                "productId",
+                "quantity",
+                "expectedPriceCop"
+              ],
               "additionalProperties": false
             }
           },
           "paymentMethod": {
             "type": "string",
-            "enum": ["cash", "nequi"]
+            "enum": [
+              "cash",
+              "nequi"
+            ]
           },
           "client": {
             "type": "object",
@@ -2524,11 +2741,16 @@
                 "maxLength": 100
               }
             },
-            "required": ["name"],
+            "required": [
+              "name"
+            ],
             "additionalProperties": false
           }
         },
-        "required": ["lines", "paymentMethod"],
+        "required": [
+          "lines",
+          "paymentMethod"
+        ],
         "additionalProperties": false
       },
       "Order": {
@@ -2547,10 +2769,20 @@
             "format": "uuid"
           },
           "status": {
-            "enum": ["confirmed", "accepted", "ready", "delivered", "cancelled"]
+            "enum": [
+              "confirmed",
+              "accepted",
+              "ready",
+              "delivered",
+              "cancelled"
+            ]
           },
           "paymentStatus": {
-            "enum": ["pending", "not_integrated", "paid"]
+            "enum": [
+              "pending",
+              "not_integrated",
+              "paid"
+            ]
           },
           "totalCop": {
             "type": "integer"
@@ -2575,7 +2807,10 @@
             "format": "uuid"
           },
           "kind": {
-            "enum": ["unit", "weight"]
+            "enum": [
+              "unit",
+              "weight"
+            ]
           },
           "stock": {
             "type": "integer"
@@ -2603,7 +2838,9 @@
       },
       "Error": {
         "type": "object",
-        "required": ["code"],
+        "required": [
+          "code"
+        ],
         "properties": {
           "code": {
             "type": "string"

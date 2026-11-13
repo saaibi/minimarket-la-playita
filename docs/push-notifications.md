@@ -1,6 +1,6 @@
 # Push de La Playita: revisión de integración
 
-Estado: propuesta técnica revisada; no se ha activado Firebase, emitido credenciales ni enviado notificaciones push reales. La aplicación actual consulta avisos en REST y recibe actualizaciones Socket.IO mientras está conectada; no registra dispositivos push.
+Estado: integración local implementada, pendiente de activar Firebase y cargar las credenciales. No se han emitido credenciales ni enviado notificaciones push reales. La API incorpora registro por cuenta/familia de sesión, cola persistente, reintentos y descarte de tokens inválidos. Android incorpora permiso voluntario, desvinculación al salir y apertura autenticada del pedido. La configuración cloud espera aceptación de condiciones del propietario.
 
 ## Primera etapa: Android
 
@@ -27,3 +27,16 @@ La web necesitará una implementación separada de Web Push, con service worker 
 - Entorno de servidor FCM: https://firebase.google.com/docs/cloud-messaging/server-environment
 - Precio FCM: https://firebase.google.com/pricing
 - Límites Render Free: https://render.com/docs/free
+
+## Contrato implementado y validación
+
+- `GET /push/options`: disponibilidad; sigue desactivada sin `PUSH_ENABLED=true` y credencial válida.
+- `POST /push/devices`: instalación UUID y token opaco, vinculado por el servidor al usuario/familia de sesión nativa actuales. Rechaza invitados y campos de suplantación; límite de diez instalaciones activas por cuenta.
+- `POST /push/devices/unregister`: solo afecta el vínculo del usuario y familia actuales.
+- Migración `010_push_notifications.sql`: tablas aditivas PostgreSQL; ninguna migración SQLite financiera.
+- Mensajes con orden/evento y texto genérico; sin correo, nombre del cliente ni deuda en la pantalla bloqueada. Estado de lectura sigue en PostgreSQL.
+- Entrega de mejor esfuerzo: ante una respuesta perdida puede repetirse un intento; la etiqueta Android por pedido reemplaza avisos de ese pedido. No se promete entrega exactamente una vez. Eventos de más de 24 horas se cancelan.
+
+La consulta de Orbit no devolvió un endpoint FCM adecuado (solo configuración MFA de otro proveedor); se usó documentación oficial Firebase/Capacitor. Postman CLI no está instalado, por lo que no se ejecutaron Context Graph ni Postman Simulation. Las pruebas Node con PostgreSQL y un proveedor HTTP local validan cola, roles, aislamiento, fallos y reintentos; no sustituyen una prueba real del SDK FCM y de Android. No se envían avisos reales desde las pruebas.
+
+Credenciales del servidor: variable privada `FIREBASE_SERVICE_ACCOUNT_JSON` en Render y `PUSH_ENABLED=true` tras configurar. Nunca en APK/Git. Configuración cliente local `.runtime/firebase/google-services.json`, copiada al Android generado por el script. Sin `google-services.json` aún no se valida el registro real en FCM.

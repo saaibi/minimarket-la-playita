@@ -9,7 +9,7 @@
   "scripts": {
     "build": "npm run build -w @playita/shared && npm run build -w @playita/mobile && npm run build -w @playita/api && npm run build -w @playita/web",
     "test": "node --import tsx --test tests/*.test.ts tests/*.test.tsx",
-    "test:integration": "npm run build -w @playita/shared && npm run build -w @playita/api && node --import tsx --test tests/integration.ts tests/auth-integration.ts tests/management-integration.ts tests/google-integration.ts",
+    "test:integration": "npm run build -w @playita/shared && npm run build -w @playita/api && node --import tsx --test tests/integration.ts tests/auth-integration.ts tests/management-integration.ts tests/google-integration.ts tests/push-integration.ts",
     "dev:api": "npm run dev -w @playita/api",
     "dev:web": "npm run dev -w @playita/web",
     "db:migrate": "node --import tsx scripts/migrate.ts",

@@ -1,3 +1,8 @@
+import {
+  useNativePush,
+  NativePushControl,
+  disconnectNativePush,
+} from "./native-push.js";
 import { usePullRefresh } from "./pull-refresh.js";
 import { remainingStock, assertCartAddition } from "./cart-stock.js";
 import { Credits, Checkout, BuyerProfile } from "./credit.js";
@@ -160,6 +165,23 @@ export function Shop() {
       }
     },
     busy || cartOpen || bellOpen || !!selected || pendingSale,
+  );
+  const nativePush = useNativePush(
+    session.actor.id,
+    !!session.actor.guest,
+    session.mode === "authenticated",
+    async (orderId, eventId) => {
+      const order = await request("/orders/" + orderId);
+      await request("/notifications/" + eventId + "/read", {
+        method: "POST",
+        body: "{}",
+      });
+      setSelected(order);
+      setView("orders");
+      setBellOpen(false);
+      await reload();
+    },
+    reload,
   );
   const box = useRef<Outbox | null>(null),
     worker = useRef<Synchronizer | null>(null),
@@ -518,6 +540,7 @@ export function Shop() {
       );
       return;
     }
+    await disconnectNativePush(session.actor.id).catch(() => {});
     await auth.logout();
   }
   async function openNotice(n: Notice) {
@@ -549,6 +572,7 @@ export function Shop() {
     );
     return (
       <>
+        <NativePushControl push={nativePush} />
         <div className="notification-tabs">
           <Button
             aria-pressed={noticeTab === "orders"}

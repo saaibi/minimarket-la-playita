@@ -12,6 +12,10 @@ fi
 npm run cap:sync -w @playita/web -- android
 "$PWD/.runtime/brand-venv/bin/python" scripts/native-brand.py
 python3 scripts/native-google.py
+if [ -f .runtime/firebase/google-services.json ]; then
+  cp .runtime/firebase/google-services.json apps/web/android/app/google-services.json
+fi
+python3 scripts/native-push.py
 # Standard generated debug signing only. No release/distribution keystore.
 python3 - <<'PY'
 from pathlib import Path
