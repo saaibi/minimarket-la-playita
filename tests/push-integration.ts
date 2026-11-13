@@ -117,9 +117,9 @@ test(
         const reply = await req("/auth/google/verify", "", "POST", {
           challengeId: challenge.challengeId,
           proof: challenge.proof,
-          credential,
+          credential: credential.repeat(4),
         });
-        assert.equal(reply.status, 200);
+        assert.equal(reply.status, 200, String(reply.data.code || ""));
         return reply.data;
       }
       const seller = await login("seller@example.invalid"),
