@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
-test("Push nativo: permiso voluntario, rechazo, registro propio, apertura y aislamiento al cambiar cuenta", async () => {
+test("Push nativo: permiso al abrir, rechazo, registro propio, apertura y aislamiento al cambiar cuenta", async () => {
   const dom = new JSDOM("<html><body></body></html>", {
     url: "http://localhost",
   });
@@ -92,9 +92,8 @@ test("Push nativo: permiso voluntario, rechazo, registro propio, apertura y aisl
     await waitFor(() =>
       assert.ok(view.getByRole("button", { name: "Activar avisos" })),
     );
-    assert.equal(permissionRequests, 0);
+    assert.equal(permissionRequests, 1);
     assert.ok(!requests.some((r) => r.path === "/push/devices"));
-    fireEvent.click(view.getByRole("button", { name: "Activar avisos" }));
     await waitFor(() => assert.ok(view.getByText(/Permiso no concedido/)));
     assert.equal(permissionRequests, 1);
     assert.ok(!requests.some((r) => r.path === "/push/devices"));
@@ -122,7 +121,7 @@ test("Push nativo: permiso voluntario, rechazo, registro propio, apertura y aisl
     session("account-b");
     view.rerender(React.createElement(Screen, { owner: "account-b" }));
     await waitFor(() =>
-      assert.ok(view.getByRole("button", { name: "Activar avisos" })),
+      assert.ok(view.getByRole("button", { name: "Desactivar avisos" })),
     );
     const before = requests.filter((r) => r.path === "/push/devices").length;
     await act(async () =>
@@ -133,15 +132,25 @@ test("Push nativo: permiso voluntario, rechazo, registro propio, apertura y aisl
       before,
     );
     assert.equal(permissionRequests, 1);
-    fireEvent.click(view.getByRole("button", { name: "Activar avisos" }));
-    await waitFor(() =>
-      assert.ok(view.getByRole("button", { name: "Desactivar avisos" })),
-    );
     fireEvent.click(view.getByRole("button", { name: "Desactivar avisos" }));
     await waitFor(() =>
       assert.ok(view.getByRole("button", { name: "Activar avisos" })),
     );
-    assert.equal(unregistered, 1);
+    const registrationsBeforeReopen = requests.filter(
+      (r) => r.path === "/push/devices",
+    ).length;
+    view.unmount();
+    const reopened = render(
+      React.createElement(Screen, { owner: "account-b" }),
+    );
+    await waitFor(() =>
+      assert.ok(reopened.getByRole("button", { name: "Activar avisos" })),
+    );
+    assert.equal(permissionRequests, 1);
+    assert.equal(
+      requests.filter((r) => r.path === "/push/devices").length,
+      registrationsBeforeReopen,
+    );
     assert.equal(
       requests.filter((r) => r.path === "/push/devices/unregister").at(-1)
         .owner,

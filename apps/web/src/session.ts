@@ -6,7 +6,7 @@ export const native = Capacitor.isNativePlatform();
 const configuredApi = import.meta.env?.VITE_API_URL || "";
 export const base = native
   ? nativeApiUrl(configuredApi)
-  : import.meta.env.DEV
+  : import.meta.env?.DEV
     ? "/api"
     : configuredApi || "/api";
 export const backendConfigured = !native || !!base;

@@ -172,7 +172,7 @@ export function useNativePush(
       if (!valid()) return;
       setReady(true);
       setAvailable(true);
-      const permission = await platform.api.checkPermissions();
+      let permission = await platform.api.checkPermissions();
       if (valid() && localStorage.getItem(preference(owner)) === "false") {
         await disconnectNativePush(owner, platform).catch(() => {
           if (valid()) {
@@ -183,15 +183,40 @@ export function useNativePush(
           }
         });
       }
+      if (!valid() || localStorage.getItem(preference(owner)) === "false")
+        return;
       if (
-        valid() &&
-        permission.receive === "granted" &&
-        localStorage.getItem(preference(owner)) === "true"
-      )
-        await nativeOperation(() => platform.api.register());
+        permission.receive === "prompt" ||
+        permission.receive === "prompt-with-rationale"
+      ) {
+        setBusy(true);
+        permission = await platform.api.requestPermissions();
+      }
+      if (!valid()) return;
+      if (permission.receive !== "granted") {
+        setBusy(false);
+        setMessage(
+          "Permiso no concedido. Puedes habilitarlo en los ajustes de Android.",
+        );
+        return;
+      }
+      localStorage.setItem(preference(owner), "true");
+      setBusy(true);
+      wait.current = setTimeout(() => {
+        if (valid()) {
+          setBusy(false);
+          setMessage("La activación tardó demasiado. Vuelve a intentarlo.");
+        }
+      }, 15000);
+      await nativeOperation(async () => {
+        if (valid()) await platform.api.register();
+      });
     })().catch(() => {
-      if (valid())
+      if (valid()) {
+        if (wait.current) clearTimeout(wait.current);
+        setBusy(false);
         setMessage("No se pudieron consultar los avisos del teléfono.");
+      }
     });
     return () => {
       active = false;
