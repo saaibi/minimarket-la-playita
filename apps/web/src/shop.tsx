@@ -1,3 +1,4 @@
+import { remainingStock, assertCartAddition } from "./cart-stock.js";
 import { Credits, Checkout, BuyerProfile } from "./credit.js";
 import Chip from "@mui/material/Chip";
 import Card from "@mui/material/Card";
@@ -132,6 +133,8 @@ export function Shop() {
       window.removeEventListener("focus", refreshCredit);
     };
   }, [session.actor.id, session.mode, staff]);
+  const cartSnapshot = useRef(cart);
+  cartSnapshot.current = cart;
   const box = useRef<Outbox | null>(null),
     worker = useRef<Synchronizer | null>(null),
     webAttempt = useRef<{ key: string; payload: string; route: string } | null>(
@@ -879,8 +882,12 @@ export function Shop() {
                       key={p.id}
                       p={p}
                       disabled={pendingSale}
+                      remaining={remainingStock(p, cart)}
                       add={(line) => {
-                        setCart((c) => [...c, line]);
+                        assertCartAddition(p, cartSnapshot.current, line);
+                        const next = [...cartSnapshot.current, line];
+                        cartSnapshot.current = next;
+                        setCart(next);
                         setMessage("Producto agregado a tu canasta");
                       }}
                     />
@@ -1318,10 +1325,12 @@ export function ProductCard({
   p,
   add,
   disabled = false,
+  remaining = p.available,
 }: {
   p: Product;
   add: (line: OrderDraft["lines"][number]) => void;
   disabled?: boolean;
+  remaining?: number;
 }) {
   const [n, setN] = useState("1"),
     [unit, setUnit] = useState<"kg" | "lb">("kg"),
@@ -1352,7 +1361,7 @@ export function ProductCard({
       <small>{p.category || "Despensa"}</small>
       {p.description && <small>{p.description}</small>}
       <small>
-        Disponible al consultar: {p.available}{" "}
+        Disponible para agregar: {remaining}{" "}
         {p.kind === "weight" ? "g" : "unidades base"}
       </small>
       <p className="price">
@@ -1374,6 +1383,11 @@ export function ProductCard({
             type="number"
             min={p.kind === "weight" ? ".001" : "1"}
             step={p.kind === "weight" ? ".001" : "1"}
+            max={
+              p.kind === "weight"
+                ? remaining / (unit === "lb" ? 500 : 1000)
+                : Math.floor(remaining / (pres?.factor || 1))
+            }
             value={n}
             onChange={(e) => setN(e.target.value)}
           />
@@ -1404,22 +1418,26 @@ export function ProductCard({
       </div>
       <Button
         className="primary"
-        disabled={disabled || p.available <= 0}
+        disabled={disabled || remaining <= 0}
         onClick={() => {
           try {
             const quantity =
               p.kind === "weight" ? grams(Number(n), unit) : Number(n);
             if (!Number.isSafeInteger(quantity) || quantity <= 0)
               throw Error("Cantidad inválida");
-            add({
+            const line = {
               productId: p.id,
               ...(p.kind === "unit" ? { presentationId: pres?.id } : {}),
               quantity,
               expectedPriceCop: price,
-            });
+            };
+            assertCartAddition({ ...p, available: remaining }, [], line);
+            add(line);
             setError("");
           } catch (e) {
-            setError(String(e));
+            setError(
+              e instanceof Error ? e.message : "No se pudo agregar el producto",
+            );
           }
         }}
       >
