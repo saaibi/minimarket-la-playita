@@ -917,6 +917,7 @@ export function Shop() {
           )}
           {view === "inventory" && staff && (
             <Inventory
+              refreshToken={refreshToken}
               products={products}
               admin={admin && session.mode === "authenticated"}
               api={request}

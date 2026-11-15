@@ -1,3 +1,4 @@
+import { businessReport, reportRange } from "./analytics.js";
 import { PushService, type PushSender } from "./push.js";
 import "reflect-metadata";
 import {
@@ -122,6 +123,31 @@ class ApiController {
       input.data.installationId,
     );
     return res.json({ ok: true });
+  }
+  @Get("reports/business") async business(
+    @Req() req: Request,
+    @Query("from") from: string,
+    @Query("to") to: string,
+    @Res() res: any,
+  ) {
+    if (req.actor.role !== "admin")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    const range = reportRange(from, to);
+    if (!range)
+      return res.status(400).json({
+        code: "INVALID_DATE_RANGE",
+        message: "Elige un rango válido de hasta 366 días.",
+      });
+    try {
+      return res.json(
+        await businessReport(this.store.pool, range.from, range.to),
+      );
+    } catch {
+      return res.status(503).json({
+        code: "REPORT_UNAVAILABLE",
+        message: "No fue posible consultar el resumen del negocio.",
+      });
+    }
   }
   @Get("inventory") inventory(@Req() req: Request) {
     return this.store.inventory(req.actor);

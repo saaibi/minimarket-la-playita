@@ -279,6 +279,22 @@ test(
       p = (await req("/inventory", admin)).data.find((x: any) => x.id === p.id);
       assert.equal(p.stock, 25);
       assert.equal(p.reserved, 15);
+      const reportPath =
+        "/reports/business?from=" + bogotaDate() + "&to=" + bogotaDate();
+      assert.equal((await req(reportPath, seller)).status, 403);
+      assert.equal((await req(reportPath, buyer)).status, 403);
+      assert.equal(
+        (await req("/reports/business?from=2026-02-30&to=2026-03-01", admin))
+          .status,
+        400,
+      );
+      const reportBeforeRemoval = (await req(reportPath, admin)).data;
+      assert.equal(
+        reportBeforeRemoval.salesCop,
+        reportBeforeRemoval.cashCop + reportBeforeRemoval.creditCop,
+      );
+      assert.equal(reportBeforeRemoval.daily.length, 1);
+      assert.equal(reportBeforeRemoval.salesCop, sale.data.totalCop);
       const beforeRemoval = (await req("/inventory", admin)).data;
       const removalPath = "/sales/" + sale.data.id + "/removal";
       const removal = {
@@ -326,6 +342,10 @@ test(
         false,
       );
       assert.deepEqual((await req("/inventory", admin)).data, beforeRemoval);
+      assert.equal(
+        (await req(reportPath, admin)).data.salesCop,
+        reportBeforeRemoval.salesCop - sale.data.totalCop,
+      );
       assert.ok(
         (await req("/audit", admin)).data.some(
           (a: any) => a.kind === "sale.removed" && a.entityId === sale.data.id,
@@ -891,9 +911,16 @@ test(
           balance,
         };
       }
+      const reportBeforeCredit = (await req(reportPath, admin)).data;
       const zero = await autoPay(0);
       assert.equal(zero.reply.status, 201);
       assert.equal(zero.reply.data.paymentStatus, "pending");
+      const reportAfterZero = (await req(reportPath, admin)).data;
+      assert.equal(
+        reportAfterZero.creditCop - reportBeforeCredit.creditCop,
+        1000,
+      );
+      assert.equal(reportAfterZero.cashCop, reportBeforeCredit.cashCop);
       const partial = await autoPay(400);
       assert.equal(partial.reply.status, 201);
       assert.equal(partial.reply.data.cashReceived, 400);
@@ -902,6 +929,16 @@ test(
       ).data.orders.find((o: any) => o.id === partial.reply.data.id);
       assert.equal(partialDetail.paidCop, 400);
       assert.equal(partialDetail.balanceCop, 600);
+      const reportAfterPartial = (await req(reportPath, admin)).data;
+      assert.equal(reportAfterPartial.cashCop - reportAfterZero.cashCop, 400);
+      assert.equal(
+        reportAfterPartial.creditCop - reportAfterZero.creditCop,
+        600,
+      );
+      assert.equal(
+        reportAfterPartial.salesCop,
+        reportAfterPartial.cashCop + reportAfterPartial.creditCop,
+      );
       assert.equal(
         (
           await req(
@@ -917,9 +954,15 @@ test(
       const exact = await autoPay(1000);
       assert.equal(exact.reply.status, 201);
       assert.equal(exact.reply.data.cashChange, 0);
+      const beforePlus = (await req(reportPath, admin)).data;
       const plus = await autoPay(1500);
       assert.equal(plus.reply.status, 201);
       assert.equal(plus.reply.data.cashChange, 0);
+      const afterPlus = (await req(reportPath, admin)).data;
+      assert.equal(afterPlus.salesCop - beforePlus.salesCop, 1000);
+      assert.equal(afterPlus.cashCop - beforePlus.cashCop, 1000);
+      assert.equal(afterPlus.paymentsCop - beforePlus.paymentsCop, 500);
+      assert.equal(afterPlus.balanceCop - beforePlus.balanceCop, -500);
       const finalBalance = (
         await req("/credit/clients/" + creditCustomer.id, seller)
       ).data.balanceCop;

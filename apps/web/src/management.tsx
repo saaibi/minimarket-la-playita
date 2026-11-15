@@ -1,3 +1,4 @@
+import { BusinessDashboard } from "./business-dashboard.js";
 import { LoadingMark } from "./ui.js";
 import { TextSizeSettings } from "./material.js";
 import { Button, Input, Select, Textarea } from "./material.js";
@@ -19,10 +20,12 @@ export function Inventory({
   admin,
   api,
   reload,
+  refreshToken = 0,
   ordersCount = 0,
   salesTotal = 0,
   onNavigate = () => {},
 }: {
+  refreshToken?: number;
   ordersCount?: number;
   salesTotal?: number;
   onNavigate?: (view: string) => void;
@@ -276,6 +279,12 @@ export function Inventory({
         <p className="empty">No hay productos para este filtro.</p>
       )}
       <p role="alert">{error}</p>
+      {admin && (
+        <BusinessDashboard
+          api={api}
+          refreshKey={`${refreshToken}-${ordersCount}-${salesTotal}-${products.map((p) => p.version).join(",")}`}
+        />
+      )}
       {edit !== undefined && (
         <ProductEditor
           product={edit}
