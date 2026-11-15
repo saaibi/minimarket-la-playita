@@ -170,6 +170,7 @@ export function Inventory({
         <table>
           <thead>
             <tr>
+              <th>Imagen</th>
               <th>Producto</th>
               <th>Físico</th>
               <th>Reservado</th>
@@ -186,6 +187,23 @@ export function Inventory({
           <tbody>
             {listed.map((p) => (
               <tr key={p.id}>
+                <td>
+                  {p.photo ? (
+                    <img
+                      className="inventory-thumbnail"
+                      src={p.photo}
+                      alt={p.name}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span
+                      className="inventory-thumbnail empty"
+                      aria-label="Sin imagen"
+                    >
+                      —
+                    </span>
+                  )}
+                </td>
                 <td>
                   <strong>{p.name}</strong>
                   <small>
@@ -530,6 +548,8 @@ function ProductEditor({
           <Input
             required
             maxLength={120}
+            spellCheck
+            lang="es"
             value={value.name}
             onChange={(e) => field("name", e.target.value)}
           />
@@ -540,6 +560,8 @@ function ProductEditor({
             <Input
               required
               maxLength={80}
+              spellCheck
+              lang="es"
               value={value.category}
               onChange={(e) => field("category", e.target.value)}
             />
@@ -556,6 +578,8 @@ function ProductEditor({
             Proveedor
             <Input
               maxLength={150}
+              spellCheck
+              lang="es"
               value={value.supplier}
               onChange={(e) => field("supplier", e.target.value)}
             />
@@ -663,6 +687,8 @@ function ProductEditor({
         <label>
           Descripción
           <Textarea
+            spellCheck
+            lang="es"
             value={value.description}
             maxLength={1000}
             onChange={(e) => field("description", e.target.value)}
@@ -694,6 +720,8 @@ function ProductEditor({
                   Nombre
                   <Input
                     required
+                    spellCheck
+                    lang="es"
                     value={p.name}
                     onChange={(e) =>
                       field(
@@ -992,7 +1020,8 @@ function Clients({ api }: { api: Api }) {
     };
   }, []);
   const [editing, setEditing] = useState<any>(null),
-    [saving, setSaving] = useState(false);
+    [saving, setSaving] = useState(false),
+    [editError, setEditError] = useState("");
   return (
     <section className="panel staff-users">
       <h2>Clientes</h2>
@@ -1024,9 +1053,10 @@ function Clients({ api }: { api: Api }) {
               <Button
                 tone="secondary"
                 type="button"
-                onClick={() =>
+                onClick={() => (
+                  setEditError(""),
                   setEditing({ ...c, creditEnabled: !!c.creditEnabled })
-                }
+                )}
               >
                 Editar
               </Button>
@@ -1040,31 +1070,56 @@ function Clients({ api }: { api: Api }) {
             if (!saving) setEditing(null);
           }}
         >
-          <p>{editing.email || editing.phone}</p>
+          <p>
+            El cambio conserva sus pedidos, deuda y la cuenta de Google
+            vinculada.
+          </p>
           <form
             onSubmit={(e) => {
               e.preventDefault();
               setSaving(true);
               void api("/auth/users/" + editing.id + "/credit", {
                 method: "POST",
-                body: JSON.stringify({ creditEnabled: editing.creditEnabled }),
+                body: JSON.stringify({
+                  creditEnabled: editing.creditEnabled,
+                  email: editing.email,
+                }),
               })
                 .then(() => {
                   setAccounts((list) =>
                     list.map((c) =>
                       c.id === editing.id
-                        ? { ...c, creditEnabled: editing.creditEnabled }
+                        ? {
+                            ...c,
+                            creditEnabled: editing.creditEnabled,
+                            email: editing.email.trim().toLowerCase(),
+                          }
                         : c,
                     ),
                   );
                   setEditing(null);
                 })
                 .catch(() =>
-                  setMessage("No se pudo guardar el permiso de crédito"),
+                  setEditError(
+                    "No se pudo guardar el cliente. Verifica que el correo no esté en uso.",
+                  ),
                 )
                 .finally(() => setSaving(false));
             }}
           >
+            <label>
+              Correo electrónico
+              <Input
+                type="email"
+                required
+                autoComplete="off"
+                spellCheck={false}
+                value={editing.email || ""}
+                onChange={(e) =>
+                  setEditing({ ...editing, email: e.target.value })
+                }
+              />
+            </label>
             <label className="check">
               <Input
                 type="checkbox"
@@ -1079,6 +1134,7 @@ function Clients({ api }: { api: Api }) {
               Deshabilitarlo impide nuevos créditos y conserva la deuda y los
               abonos anteriores.
             </p>
+            {editError && <p role="alert">{editError}</p>}
             <Button type="submit" disabled={saving}>
               Guardar cliente
             </Button>

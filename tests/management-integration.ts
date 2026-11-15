@@ -1030,6 +1030,65 @@ test(
         "TOTAL_CHANGED",
       );
       assert.deepEqual((await req("/inventory", admin)).data, beforeRejected);
+      const accountBeforeEdit = (
+        await req("/credit/clients/" + creditCustomer.id, seller)
+      ).data;
+      const newEmail = "  Corrected-Customer@example.invalid  ";
+      assert.equal(
+        (
+          await req(permissionPath, seller, "POST", {
+            creditEnabled: true,
+            email: newEmail,
+          })
+        ).status,
+        403,
+      );
+      assert.equal(
+        (
+          await req(permissionPath, admin, "POST", {
+            creditEnabled: true,
+            email: "not-an-email",
+          })
+        ).status,
+        400,
+      );
+      assert.equal(
+        (
+          await req(permissionPath, admin, "POST", {
+            creditEnabled: true,
+            email: "owner@example.invalid",
+          })
+        ).status,
+        409,
+      );
+      assert.equal(
+        (
+          await req(permissionPath, admin, "POST", {
+            creditEnabled: true,
+            email: newEmail,
+          })
+        ).status,
+        200,
+      );
+      const editedCustomer = (await req("/auth/customers", admin)).data.find(
+        (c: any) => c.id === creditCustomer.id,
+      );
+      assert.equal(editedCustomer.email, "corrected-customer@example.invalid");
+      assert.equal(editedCustomer.creditEnabled, true);
+      const accountAfterEdit = (
+        await req("/credit/clients/" + creditCustomer.id, seller)
+      ).data;
+      assert.equal(accountAfterEdit.balanceCop, accountBeforeEdit.balanceCop);
+      assert.deepEqual(accountAfterEdit.orders, accountBeforeEdit.orders);
+      assert.equal(
+        (
+          await server.pool.query(
+            "SELECT count(*)::int n FROM google_identities WHERE user_id=$1",
+            [creditCustomer.id],
+          )
+        ).rows[0].n,
+        1,
+      );
     } finally {
       await server?.close();
       await root.query(`DROP SCHEMA ${schema} CASCADE`);

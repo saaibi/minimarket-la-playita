@@ -722,7 +722,7 @@ export class AuthService {
           throw new AuthError(403, "FORBIDDEN");
         const id = z.uuid().parse(path.split("/")[3]);
         const input = z
-          .object({ creditEnabled: z.boolean() })
+          .object({ creditEnabled: z.boolean(), email: email.optional() })
           .strict()
           .parse(body);
         const db = await this.pool.connect();
@@ -730,28 +730,34 @@ export class AuthService {
           await db.query("BEGIN");
           const user = (
             await db.query(
-              "SELECT id,credit_enabled,is_guest FROM app_users WHERE id=$1 FOR UPDATE",
+              "SELECT id,email,role,credit_enabled,is_guest FROM app_users WHERE id=$1 FOR UPDATE",
               [id],
             )
           ).rows[0];
           if (!user || user.is_guest) throw new AuthError(404, "NOT_FOUND");
-          await db.query("UPDATE app_users SET credit_enabled=$2 WHERE id=$1", [
-            id,
-            input.creditEnabled,
-          ]);
+          if (input.email !== undefined && user.role !== "buyer")
+            throw new AuthError(403, "FORBIDDEN");
+          await db.query(
+            "UPDATE app_users SET credit_enabled=$2,email=COALESCE($3,email) WHERE id=$1",
+            [id, input.creditEnabled, input.email ?? null],
+          );
           await db.query(
             "INSERT INTO inventory_audit(actor_id,kind,entity_id,before_data,after_data,reason) VALUES($1,'account.credit',$2,$3,$4,'Permiso de crédito por administrador')",
             [
               session.actor.id,
               id,
-              JSON.stringify({ creditEnabled: user.credit_enabled }),
+              JSON.stringify({
+                creditEnabled: user.credit_enabled,
+                email: user.email,
+              }),
               JSON.stringify(input),
             ],
           );
           await db.query("COMMIT");
           return res.json({ id, ...input });
-        } catch (e) {
+        } catch (e: any) {
           await db.query("ROLLBACK");
+          if (e.code === "23505") throw new AuthError(409, "EMAIL_IN_USE");
           throw e;
         } finally {
           db.release();

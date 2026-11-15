@@ -1947,3 +1947,17 @@ label .MuiInputBase-root {
   width: 100%;
   height: 100%;
 }
+.inventory-thumbnail {
+  display: block;
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--bg, #f7f8f2);
+}
+.inventory-thumbnail.empty {
+  display: grid;
+  place-items: center;
+  color: #65746c;
+}
