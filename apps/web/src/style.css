@@ -1943,3 +1943,7 @@ label .MuiInputBase-root {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.business-chart-canvas svg {
+  width: 100%;
+  height: 100%;
+}
