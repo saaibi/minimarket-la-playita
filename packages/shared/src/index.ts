@@ -50,6 +50,7 @@ export type Product = {
   id: string;
   name: string;
   kind: "unit" | "weight";
+  weightUnit?: "kg" | "lb";
   priceCop: number;
   stock: number;
   reserved: number;
@@ -94,8 +95,13 @@ export function lineTotal(
   return Math.round((quantity * price) / (kind === "weight" ? 1000 : 1));
 }
 export function grams(value: number, unit: "kg" | "lb") {
-  const result = value * (unit === "kg" ? 1000 : 500);
-  if (!Number.isSafeInteger(result) || result <= 0)
+  const raw = value * (unit === "kg" ? 1000 : 500),
+    result = Math.round(raw);
+  if (
+    !Number.isSafeInteger(result) ||
+    result <= 0 ||
+    Math.abs(raw - result) > 1e-7
+  )
     throw Error("Usa una cantidad representable en gramos enteros");
   return result;
 }
@@ -112,3 +118,33 @@ export function canonical(value: unknown): string {
   );
 }
 export * from "./management.js";
+
+/** Storage stays in grams; only the product's chosen sales measure changes. */
+export function weightFactor(unit: "kg" | "lb" = "kg") {
+  return unit === "lb" ? 500 : 1000;
+}
+export function stockLabel(
+  product: Pick<Product, "kind" | "weightUnit">,
+  quantity: number,
+  unit = product.weightUnit || "kg",
+) {
+  const value =
+    product.kind === "weight" ? quantity / weightFactor(unit) : quantity;
+  const label =
+    product.kind === "weight"
+      ? unit === "lb"
+        ? value === 1
+          ? "libra"
+          : "libras"
+        : value === 1
+          ? "kilo"
+          : "kilos"
+      : value === 1
+        ? "unidad"
+        : "unidades";
+  return (
+    new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 }).format(value) +
+    " " +
+    label
+  );
+}

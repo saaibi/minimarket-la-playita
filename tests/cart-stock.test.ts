@@ -70,7 +70,7 @@ test("Canasta: kilos y libras comparten disponibilidad en gramos", () => {
   };
   const cart = [kilo, pound];
   assert.equal(remainingStock(p, cart), 250);
-  assert.throws(() => assertCartAddition(p, cart, pound), /250 g/);
+  assert.throws(() => assertCartAddition(p, cart, pound), /0,25 kilos/);
   assertCartAddition(p, cart, { ...kilo, quantity: 250 });
   assert.throws(() => assertCartAddition(p, cart, { ...kilo, quantity: 251 }));
 });

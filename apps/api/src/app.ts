@@ -53,7 +53,7 @@ class ApiController {
     try {
       const healthQuery = {
         text: "SELECT version FROM schema_migrations WHERE version = $1",
-        values: ["010_push_notifications.sql"],
+        values: ["011_product_weight_unit.sql"],
         query_timeout: 2500,
       };
       const result = await this.store.pool.query(healthQuery);

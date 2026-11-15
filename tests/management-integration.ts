@@ -130,6 +130,47 @@ test(
         ).status,
         201,
       );
+      const weighted = await req("/inventory", admin, "POST", {
+        name: "Peso en libras",
+        kind: "weight",
+        weightUnit: "lb",
+        priceCop: 4000,
+        costCop: 2000,
+        minimum: 500,
+        visible: true,
+        initialStock: 1500,
+        presentations: [],
+      });
+      assert.equal(weighted.status, 201);
+      let weightProduct = (await req("/inventory", admin)).data.find(
+        (x: any) => x.id === weighted.data.id,
+      );
+      assert.equal(weightProduct.weightUnit, "lb");
+      assert.equal(weightProduct.stock, 1500);
+      assert.equal(weightProduct.priceCop, 4000);
+      assert.equal(weightProduct.minimum, 500);
+      const changedWeight = await req(
+        "/inventory/" + weightProduct.id,
+        admin,
+        "PUT",
+        {
+          name: weightProduct.name,
+          kind: "weight",
+          weightUnit: "kg",
+          priceCop: 4000,
+          costCop: 2000,
+          minimum: 500,
+          visible: true,
+          version: weightProduct.version,
+          presentations: [],
+        },
+      );
+      assert.equal(changedWeight.status, 201);
+      weightProduct = (await req("/inventory", admin)).data.find(
+        (x: any) => x.id === weighted.data.id,
+      );
+      assert.equal(weightProduct.weightUnit, "kg");
+      assert.equal(weightProduct.stock, 1500);
       const input = {
         name: "Producto prueba",
         kind: "unit",

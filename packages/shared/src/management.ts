@@ -17,6 +17,7 @@ export const productWriteSchema = z
       ])
       .default(""),
     kind: z.enum(["unit", "weight"]),
+    weightUnit: z.enum(["kg", "lb"]).optional(),
     priceCop: money,
     costCop: money,
     minimum: z.number().int().min(0).max(100000000),

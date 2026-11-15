@@ -16,6 +16,7 @@ import {
   type OrderDraft,
   type Schedule,
   grams,
+  stockLabel,
   lineTotal,
   isStoreOpen,
 } from "@playita/shared";
@@ -49,6 +50,7 @@ type Order = {
   channel: string;
   lines: {
     productName: string;
+    productId?: string;
     presentationName: string;
     quantity: number;
     kind: string;
@@ -1153,14 +1155,13 @@ export function Shop() {
                       "Producto"}
                   </strong>
                   <small>
-                    {l.quantity}{" "}
                     {products.find((p) => p.id === l.productId)?.kind ===
                     "weight"
-                      ? "g"
-                      : products
-                          .find((p) => p.id === l.productId)
-                          ?.presentations.find((v) => v.id === l.presentationId)
-                          ?.name || "unidades"}{" "}
+                      ? stockLabel(
+                          products.find((p) => p.id === l.productId)!,
+                          l.quantity,
+                        )
+                      : `${l.quantity} ${products.find((p) => p.id === l.productId)?.presentations.find((v) => v.id === l.presentationId)?.name || "unidades"}`}{" "}
                     ·{" "}
                     {money(
                       lineTotal(
@@ -1307,8 +1308,17 @@ export function Shop() {
               <span>
                 {l.productName}
                 <small>
-                  {l.quantity}{" "}
-                  {l.kind === "weight" ? "g" : l.presentationName || "unidades"}
+                  {l.kind === "weight"
+                    ? stockLabel(
+                        {
+                          kind: "weight",
+                          weightUnit: products.find(
+                            (p) => p.name === l.productName,
+                          )?.weightUnit,
+                        },
+                        l.quantity,
+                      )
+                    : `${l.quantity} ${l.presentationName || "unidades"}`}
                 </small>
               </span>
               <strong>{money(l.totalCop)}</strong>
@@ -1415,9 +1425,10 @@ export function ProductCard({
   remaining?: number;
 }) {
   const [n, setN] = useState("1"),
-    [unit, setUnit] = useState<"kg" | "lb">("kg"),
+    [unit, setUnit] = useState<"kg" | "lb">(p.weightUnit || "kg"),
     [id, setId] = useState(p.presentations[0]?.id || ""),
     [error, setError] = useState("");
+  useEffect(() => setUnit(p.weightUnit || "kg"), [p.weightUnit]);
   const pres = p.presentations.find((v) => v.id === id) || p.presentations[0],
     price = pres?.priceCop ?? p.priceCop;
   return (
@@ -1445,9 +1456,8 @@ export function ProductCard({
         <small className="product-description">{p.description}</small>
       )}
       <small>
-        <span className="stock-label">Disponible para agregar: </span>
-        <span className="stock-label-compact">Quedan: </span>
-        {remaining} {p.kind === "weight" ? "g" : "unidades base"}
+        <span>Quedan: </span>
+        {stockLabel(p, remaining, unit)}
       </small>
       <p className="price">
         {money(

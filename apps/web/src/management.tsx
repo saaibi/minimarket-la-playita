@@ -7,6 +7,8 @@ import {
   type ProductWrite,
   type Schedule,
   bogotaDate,
+  stockLabel,
+  weightFactor,
 } from "@playita/shared";
 import { Modal, money } from "./ui.js";
 import { ProductPhoto } from "./product-photo.js";
@@ -75,8 +77,8 @@ export function Inventory({
           <p className="eyebrow">CONTROL DE TU TIENDA</p>
           <h1>Todo en su lugar</h1>
           <p>
-            Existencias en unidades base o gramos. Reservas compartidas entre
-            presentaciones.
+            Existencias según la medida de cada producto. Reservas compartidas
+            entre presentaciones.
           </p>
         </div>
         {admin && (
@@ -169,10 +171,10 @@ export function Inventory({
               <th>Físico</th>
               <th>Reservado</th>
               <th>Disponible</th>
-              <th>Precio base</th>
+              <th>Precio de venta</th>
               {admin && (
                 <>
-                  <th>Costo base</th>
+                  <th>Costo</th>
                   <th>Acciones</th>
                 </>
               )}
@@ -188,7 +190,9 @@ export function Inventory({
                   </small>
                   <small>
                     {p.kind === "weight"
-                      ? "Gramos · precio por kilo"
+                      ? p.weightUnit === "lb"
+                        ? "Por libra"
+                        : "Por kilo"
                       : "Unidades"}{" "}
                     · {p.visible === false ? "Oculto" : "Visible"}
                   </small>
@@ -200,21 +204,33 @@ export function Inventory({
                       .join(" · ")}
                   </small>
                 </td>
-                <td>{p.stock}</td>
-                <td>{p.reserved}</td>
+                <td>{stockLabel(p, p.stock)}</td>
+                <td>{stockLabel(p, p.reserved)}</td>
                 <td>
                   <span
                     className={
                       "tag " + (p.available <= (p.minimum || 0) ? "warn" : "")
                     }
                   >
-                    {p.available}
+                    {stockLabel(p, p.available)}
                   </span>
                 </td>
-                <td>{money(p.priceCop)}</td>
+                <td>
+                  {money(
+                    p.kind === "weight" && p.weightUnit === "lb"
+                      ? p.priceCop / 2
+                      : p.priceCop,
+                  )}
+                </td>
                 {admin && (
                   <>
-                    <td>{money(p.costCop || 0)}</td>
+                    <td>
+                      {money(
+                        p.kind === "weight" && p.weightUnit === "lb"
+                          ? (p.costCop || 0) / 2
+                          : p.costCop || 0,
+                      )}
+                    </td>
                     <td className="product-actions-cell">
                       <div className="product-actions">
                         <Button tone="secondary" onClick={() => setEdit(p)}>
@@ -227,7 +243,13 @@ export function Inventory({
                             setChangePrice(false);
                             setPrices(
                               p.kind === "weight"
-                                ? { kilo: String(p.priceCop) }
+                                ? {
+                                    kilo: String(
+                                      p.weightUnit === "lb"
+                                        ? p.priceCop / 2
+                                        : p.priceCop,
+                                    ),
+                                  }
                                 : Object.fromEntries(
                                     p.presentations.map((v) => [
                                       v.id,
@@ -272,10 +294,11 @@ export function Inventory({
       {adjust && (
         <Modal title={"Ajustar " + adjust.name} close={() => setAdjust(null)}>
           <p>
-            Físico: {adjust.stock}. Reservado: {adjust.reserved}.{" "}
+            Físico: {stockLabel(adjust, adjust.stock)}. Reservado:{" "}
+            {stockLabel(adjust, adjust.reserved)}.{" "}
             {adjust.kind === "weight"
-              ? "Ingresa gramos enteros."
-              : "Ingresa unidades base."}
+              ? `Ingresa ${adjust.weightUnit === "lb" ? "libras" : "kilos"}.`
+              : "Ingresa unidades."}
           </p>
           <form
             onSubmit={(e) => {
@@ -285,12 +308,20 @@ export function Inventory({
                 method: "POST",
                 headers: { "Idempotency-Key": crypto.randomUUID() },
                 body: JSON.stringify({
-                  delta: Number(delta),
+                  delta:
+                    Number(delta) *
+                    (adjust.kind === "weight"
+                      ? weightFactor(adjust.weightUnit)
+                      : 1),
                   reason,
                   version: adjust.version,
                   ...(changePrice
                     ? adjust.kind === "weight"
-                      ? { priceCop: Number(prices.kilo) }
+                      ? {
+                          priceCop:
+                            Number(prices.kilo) *
+                            (adjust.weightUnit === "lb" ? 2 : 1),
+                        }
                       : {
                           presentationPrices: adjust.presentations.map((v) => ({
                             id: v.id,
@@ -310,7 +341,13 @@ export function Inventory({
               Cambio (+ ingreso / − salida)
               <Input
                 type="number"
-                step="1"
+                step={
+                  adjust.kind === "weight"
+                    ? adjust.weightUnit === "lb"
+                      ? "0.002"
+                      : "0.001"
+                    : "1"
+                }
                 value={delta}
                 required
                 onChange={(e) => setDelta(e.target.value)}
@@ -333,7 +370,15 @@ export function Inventory({
                   actualizar solo precios.
                 </p>
                 {(adjust.kind === "weight"
-                  ? [{ id: "kilo", name: "Precio por kilo" }]
+                  ? [
+                      {
+                        id: "kilo",
+                        name:
+                          adjust.weightUnit === "lb"
+                            ? "Precio por libra"
+                            : "Precio por kilo",
+                      },
+                    ]
                   : adjust.presentations
                 ).map((v) => (
                   <label key={v.id}>
@@ -430,6 +475,7 @@ function ProductEditor({
       description: product?.description || "",
       photo: product?.photo || "",
       kind: product?.kind || "unit",
+      weightUnit: product?.weightUnit || "kg",
       priceCop: product?.priceCop || 0,
       costCop: product?.costCop || 0,
       minimum: product?.minimum || 0,
@@ -441,8 +487,8 @@ function ProductEditor({
     }),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [priceUnit, setPriceUnit] = useState("kg"),
     [photoBusy, setPhotoBusy] = useState(false);
+  const priceUnit = value.weightUnit || "kg";
   const field = (key: keyof ProductWrite, v: any) =>
     setValue((p) => {
       const next = { ...p, [key]: v };
@@ -523,15 +569,15 @@ function ProductEditor({
             }
           >
             <option value="unit">Por unidades / presentaciones</option>
-            <option value="weight">Por peso (gramos)</option>
+            <option value="weight">Por peso</option>
           </Select>
         </label>
         {value.kind === "weight" && (
           <label>
-            Unidad del precio y costo
+            Medida del producto
             <Select
               value={priceUnit}
-              onChange={(e) => setPriceUnit(e.target.value)}
+              onChange={(e) => field("weightUnit", e.target.value)}
             >
               <option value="kg">Kilo</option>
               <option value="lb">Libra</option>
@@ -551,15 +597,15 @@ function ProductEditor({
               {
                 (
                   {
-                    priceCop: "Precio por kilo / unidad base (COP)",
-                    costCop: "Costo por kilo / unidad base (COP)",
+                    priceCop: `Precio por ${value.kind === "weight" ? (priceUnit === "lb" ? "libra" : "kilo") : "unidad"} (COP)`,
+                    costCop: `Costo por ${value.kind === "weight" ? (priceUnit === "lb" ? "libra" : "kilo") : "unidad"} (COP)`,
                     minimum:
                       value.kind === "weight"
-                        ? "Mínimo de alerta (kilos)"
+                        ? `Mínimo de alerta (${priceUnit === "lb" ? "libras" : "kilos"})`
                         : "Mínimo de alerta (unidades)",
                     initialStock:
                       value.kind === "weight"
-                        ? "Existencias iniciales (kilos)"
+                        ? `Existencias iniciales (${priceUnit === "lb" ? "libras" : "kilos"})`
                         : "Existencias iniciales (unidades)",
                   } as any
                 )[key]
@@ -568,14 +614,21 @@ function ProductEditor({
                 type="number"
                 required
                 min="0"
-                step="1"
+                step={
+                  value.kind === "weight" &&
+                  (key === "minimum" || key === "initialStock")
+                    ? priceUnit === "lb"
+                      ? "0.002"
+                      : "0.001"
+                    : "1"
+                }
                 max="100000000"
                 clearZero
                 value={
                   ((value as any)[key] || 0) /
                   (value.kind === "weight"
                     ? key === "minimum" || key === "initialStock"
-                      ? 1000
+                      ? weightFactor(priceUnit)
                       : priceUnit === "lb"
                         ? 2
                         : 1
@@ -587,7 +640,7 @@ function ProductEditor({
                     Number(e.target.value) *
                       (value.kind === "weight"
                         ? key === "minimum" || key === "initialStock"
-                          ? 1000
+                          ? weightFactor(priceUnit)
                           : priceUnit === "lb"
                             ? 2
                             : 1

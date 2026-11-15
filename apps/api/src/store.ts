@@ -34,7 +34,7 @@ export class Store {
   ) {}
   async inventory(actor: Actor) {
     const { rows } = await this.pool.query(
-      `SELECT id,name,kind,price_cop AS "priceCop",stock,reserved,stock-reserved AS available,version,minimum,visible,category,code,description,photo${actor.role === "admin" ? ',cost_cop AS "costCop",supplier' : ""} FROM products ${actor.role === "buyer" ? "WHERE visible" : ""} ORDER BY name`,
+      `SELECT id,name,kind,weight_unit AS "weightUnit",price_cop AS "priceCop",stock,reserved,stock-reserved AS available,version,minimum,visible,category,code,description,photo${actor.role === "admin" ? ',cost_cop AS "costCop",supplier' : ""} FROM products ${actor.role === "buyer" ? "WHERE visible" : ""} ORDER BY name`,
     );
     for (const p of rows)
       p.presentations = (
@@ -991,7 +991,7 @@ export class Store {
             ],
           );
         await db.query(
-          "UPDATE products SET category=$2,code=$3,supplier=$4,description=$5,photo=$6 WHERE id=$1",
+          "UPDATE products SET category=$2,code=$3,supplier=$4,description=$5,photo=$6,weight_unit=$7 WHERE id=$1",
           [
             id,
             input.category,
@@ -999,6 +999,7 @@ export class Store {
             input.supplier,
             input.description,
             input.photo,
+            input.weightUnit || old?.weight_unit || "kg",
           ],
         );
         const oldPresentations = (

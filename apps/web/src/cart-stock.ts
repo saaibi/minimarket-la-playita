@@ -1,4 +1,9 @@
-import { baseQuantity, type Product, type OrderDraft } from "@playita/shared";
+import {
+  stockLabel,
+  baseQuantity,
+  type Product,
+  type OrderDraft,
+} from "@playita/shared";
 type Lines = OrderDraft["lines"];
 export function cartBaseQuantity(product: Product, lines: Lines) {
   return lines
@@ -31,6 +36,6 @@ export function assertCartAddition(
     requested > remaining
   )
     throw Error(
-      `Solo quedan ${remaining} ${product.kind === "weight" ? "g" : "unidades base"} disponibles para agregar; lo que ya está en la canasta está descontado.`,
+      `Solo quedan ${stockLabel(product, remaining)} disponibles para agregar; lo que ya está en la canasta está descontado.`,
     );
 }

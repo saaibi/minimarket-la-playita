@@ -159,7 +159,7 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
         assert.ok(view.getByRole("heading", { name: "Clientes" }));
         assert.ok(view.getByRole("heading", { name: "Horario · Bogotá" }));
         fireEvent.click(view.getByRole("button", { name: "Inventario" }));
-        assert.ok(view.getByRole("columnheader", { name: "Costo base" }));
+        assert.ok(view.getByRole("columnheader", { name: "Costo" }));
         fireEvent.click(view.getByRole("button", { name: "Ajustar" }));
         assert.equal(
           view.queryByRole("group", { name: "Nuevos precios de venta" }),
