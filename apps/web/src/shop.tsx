@@ -280,7 +280,9 @@ export function Shop() {
       }
     }
     async function work() {
+      if (!active) return;
       try {
+        const before = await ownBox?.list();
         await auth.flushLogout();
         if (
           auth.current?.actor.id === session.actor.id &&
@@ -288,6 +290,20 @@ export function Shop() {
         )
           await ownWorker?.sync();
         await update();
+        const after = await ownBox?.list();
+        if (
+          active &&
+          after?.some(
+            (row) =>
+              row.status === "synced" &&
+              before?.some(
+                (old) =>
+                  old.request_key === row.request_key &&
+                  old.status !== "synced",
+              ),
+          )
+        )
+          await refresh();
       } catch {
         if (active)
           setMessage(
@@ -325,6 +341,7 @@ export function Shop() {
           }
         }
         await refresh();
+        await work();
         if (session.mode === "authenticated") {
           socket.auth = await auth.socketCredentials(session.actor.id);
           if (active) socket.connect();
@@ -572,7 +589,6 @@ export function Shop() {
     );
     return (
       <>
-        <NativePushControl push={nativePush} />
         <div className="notification-tabs">
           <Button
             aria-pressed={noticeTab === "orders"}
@@ -737,7 +753,11 @@ export function Shop() {
               </Button>
             )}
             {o.paymentStatus !== "paid" && (
-              <Button disabled={busy} onClick={() => void action(o, "cancel")}>
+              <Button
+                tone="error"
+                disabled={busy}
+                onClick={() => void action(o, "cancel")}
+              >
                 Cancelar pedido
               </Button>
             )}
@@ -1033,55 +1053,42 @@ export function Shop() {
                   .
                 </p>
               )}
-              {native && (
-                <section className="panel">
-                  <h2>Pedidos guardados en este dispositivo</h2>
-                  <Button
-                    onClick={() =>
-                      void worker.current
-                        ?.sync()
-                        .then(async () => {
-                          if (box.current) setRows(await box.current.list());
-                          await reload();
-                        })
-                        .catch(() =>
-                          setMessage(
-                            "No se pudo sincronizar; tus pendientes se conservan.",
-                          ),
-                        )
-                    }
-                  >
-                    Reintentar envío
-                  </Button>
-                  {rows.map((r) => (
-                    <div className="queue" key={r.request_key}>
-                      <strong>{statusName[r.status]}</strong>
-                      {r.status === "conflict" && !r.resolved_by && (
-                        <Button
-                          onClick={() => {
-                            const d = JSON.parse(r.payload) as OrderDraft;
-                            setCart(d.lines);
-                            setClient(d.client?.name || "");
-                            setPayment(d.paymentMethod);
-                            setRevision(r.request_key);
-                            setCartOpen(true);
-                            setMessage(
-                              "Revisa cantidades y precios; la solicitud original se conservará.",
-                            );
-                          }}
-                        >
-                          Revisar en canasta
-                        </Button>
-                      )}
-                      {r.resolved_by && (
-                        <small>
-                          Se creó una revisión; original conservado.
-                        </small>
-                      )}
-                    </div>
-                  ))}
-                </section>
-              )}
+              {native &&
+                rows.some((r) => r.status !== "synced" && !r.resolved_by) && (
+                  <section className="panel">
+                    <h2>Pedidos pendientes de envío</h2>
+                    <p>Se envían automáticamente al recuperar conexión.</p>
+                    {rows
+                      .filter((r) => r.status !== "synced" && !r.resolved_by)
+                      .map((r) => (
+                        <div className="queue" key={r.request_key}>
+                          <strong>{statusName[r.status]}</strong>
+                          {r.status === "conflict" && !r.resolved_by && (
+                            <Button
+                              onClick={() => {
+                                const d = JSON.parse(r.payload) as OrderDraft;
+                                setCart(d.lines);
+                                setClient(d.client?.name || "");
+                                setPayment(d.paymentMethod);
+                                setRevision(r.request_key);
+                                setCartOpen(true);
+                                setMessage(
+                                  "Revisa cantidades y precios; la solicitud original se conservará.",
+                                );
+                              }}
+                            >
+                              Revisar en canasta
+                            </Button>
+                          )}
+                          {r.resolved_by && (
+                            <small>
+                              Se creó una revisión; original conservado.
+                            </small>
+                          )}
+                        </div>
+                      ))}
+                  </section>
+                )}
             </>
           )}
           {view === "notifications" && (
@@ -1090,6 +1097,7 @@ export function Shop() {
               {noticesBody()}
             </>
           )}
+          {view === "settings" && <NativePushControl push={nativePush} />}
           {view === "settings" && !admin && (
             <>
               <div className="heading">
@@ -1144,6 +1152,7 @@ export function Shop() {
                   </small>
                 </div>
                 <Button
+                  tone="error"
                   disabled={pendingSale || busy}
                   onClick={() => setCart((c) => c.filter((_, j) => i !== j))}
                 >

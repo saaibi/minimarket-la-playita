@@ -106,21 +106,26 @@ export function TextSizeSettings() {
         onChange={(_event, value) => setTextSize(value as number)}
       />
       <p aria-live="polite">Tamaño actual: {textSize}%</p>
-      <Button onClick={() => setTextSize(100)}>Restablecer tamaño</Button>
+      <Button tone="secondary" onClick={() => setTextSize(100)}>
+        Restablecer tamaño
+      </Button>
     </section>
   );
 }
 export function Button({
   className = "",
   type = "submit",
+  tone = "primary",
   ...props
-}: Omit<React.ComponentProps<"button">, "color">) {
-  const contained = className.split(/\s+/).includes("primary");
+}: Omit<React.ComponentProps<"button">, "color"> & {
+  tone?: "primary" | "secondary" | "error";
+}) {
   return (
     <MuiButton
       {...props}
       type={type}
-      variant={contained ? "contained" : "outlined"}
+      color={tone}
+      variant="contained"
       className={className}
     />
   );

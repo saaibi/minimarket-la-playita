@@ -296,6 +296,7 @@ export function NativePushControl({
     <section className="phone-notifications">
       <p>Avisos en este teléfono</p>
       <Button
+        tone={push.enabled ? "error" : "primary"}
         disabled={push.busy}
         onClick={() =>
           void (push.enabled ? push.deactivate() : push.activate())

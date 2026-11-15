@@ -189,6 +189,7 @@ export function ProductPhoto({
       <legend>Foto opcional</legend>
       <div className="photo-actions">
         <Button
+          tone="secondary"
           type="button"
           disabled={working}
           onClick={() => upload.current?.click()}
@@ -240,6 +241,7 @@ export function ProductPhoto({
               Capturar foto
             </Button>
             <Button
+              tone="secondary"
               type="button"
               onClick={() => {
                 operation.current++;
@@ -260,7 +262,12 @@ export function ProductPhoto({
             src={photo}
             alt="Vista previa del producto"
           />
-          <Button type="button" disabled={working} onClick={() => onChange("")}>
+          <Button
+            tone="error"
+            type="button"
+            disabled={working}
+            onClick={() => onChange("")}
+          >
             Quitar foto
           </Button>
         </div>

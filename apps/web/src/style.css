@@ -1695,3 +1695,45 @@ label .MuiInputBase-root {
   margin-top: 6px;
   font-size: 0.75rem;
 }
+
+/* Consistent field metrics across Android WebViews and desktop browsers. */
+.MuiOutlinedInput-root:not(.MuiInputBase-multiline):not(
+    .MuiAutocomplete-inputRoot
+  ) {
+  min-height: 44px;
+  font-size: 1rem;
+}
+.MuiOutlinedInput-root:not(.MuiAutocomplete-inputRoot) input.MuiInputBase-input,
+.MuiOutlinedInput-root:not(.MuiAutocomplete-inputRoot)
+  select.MuiNativeSelect-select {
+  height: 44px;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  line-height: 24px;
+  font: inherit;
+}
+.MuiOutlinedInput-root select.MuiNativeSelect-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 36px;
+}
+.MuiButton-root + .MuiButton-root {
+  margin-inline-start: 8px;
+}
+.product-actions .MuiButton-root + .MuiButton-root,
+.notification-tabs .MuiButton-root + .MuiButton-root {
+  margin-inline-start: 0;
+}
+.MuiButton-containedPrimary {
+  background-color: #153e31;
+  color: #fff;
+}
+.MuiButton-containedSecondary {
+  background-color: #17658d;
+  color: #fff;
+}
+.MuiButton-containedError {
+  background-color: #b3261e;
+  color: #fff;
+}

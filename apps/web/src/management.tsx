@@ -196,7 +196,9 @@ export function Inventory({
                     <td>{money(p.costCop || 0)}</td>
                     <td className="product-actions-cell">
                       <div className="product-actions">
-                        <Button onClick={() => setEdit(p)}>Editar</Button>
+                        <Button tone="secondary" onClick={() => setEdit(p)}>
+                          Editar
+                        </Button>
                         <Button
                           onClick={() => {
                             setAdjust(p);
@@ -345,7 +347,11 @@ export function Inventory({
             <Button className="primary" disabled={busy}>
               Guardar ajuste
             </Button>
-            <Button type="button" onClick={() => setAdjust(null)}>
+            <Button
+              tone="secondary"
+              type="button"
+              onClick={() => setAdjust(null)}
+            >
               Cancelar
             </Button>
           </form>
@@ -658,6 +664,7 @@ function ProductEditor({
                   />
                 </label>
                 <Button
+                  tone="error"
                   type="button"
                   onClick={() =>
                     field(
@@ -687,7 +694,7 @@ function ProductEditor({
         <Button className="primary" disabled={busy || photoBusy}>
           Guardar producto
         </Button>
-        <Button type="button" onClick={close}>
+        <Button tone="secondary" type="button" onClick={close}>
           Cancelar
         </Button>
       </form>
@@ -919,6 +926,7 @@ function Clients({ api }: { api: Api }) {
               {c.creditEnabled ? "habilitado" : "deshabilitado"}
             </small>
             <Button
+              tone="secondary"
               type="button"
               onClick={() =>
                 setEditing({ ...c, creditEnabled: !!c.creditEnabled })
@@ -1014,7 +1022,9 @@ function AuditSettings({ api }: { api: Api }) {
         Cada cambio conserva motivo, responsable y antes/después. Últimos 200
         movimientos.
       </p>
-      <Button onClick={() => void load()}>Actualizar movimientos</Button>
+      <Button tone="secondary" onClick={() => void load()}>
+        Actualizar movimientos
+      </Button>
       {rows.map((r) => (
         <article className="audit" key={r.id}>
           <strong>

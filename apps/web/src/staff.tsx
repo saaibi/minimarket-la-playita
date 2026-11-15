@@ -103,6 +103,7 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
                 </small>
               </span>
               <Button
+                tone="secondary"
                 type="button"
                 onClick={() => {
                   setEmail(u.email);
@@ -113,6 +114,7 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
                 Editar cuenta
               </Button>
               <Button
+                tone="error"
                 disabled={!u.active || u.id === session.actor.id}
                 onClick={() => {
                   void (async () => {

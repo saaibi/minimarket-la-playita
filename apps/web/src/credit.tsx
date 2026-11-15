@@ -432,10 +432,6 @@ export function Credits({
   return (
     <section className="credit-module">
       <h1>Créditos</h1>
-      <p>
-        Productos entregados a nombre de cada cliente, abonos en efectivo y
-        saldo por cobrar.
-      </p>
       {attempt && (
         <section className="panel">
           <h2>Operación por confirmar</h2>
@@ -452,18 +448,7 @@ export function Credits({
           </Button>
         </section>
       )}
-      <p>
-        Solo cuentas registradas. Para un cliente nuevo, debe registrarse con
-        Google o el administrador crear su cuenta en Ajustes.
-      </p>
       <p role="status">{message}</p>
-      <Button
-        type="button"
-        disabled={busy}
-        onClick={() => void load().catch((e) => setMessage(e.message))}
-      >
-        Actualizar saldos
-      </Button>
       <div className="form-grid">
         <label>
           Buscar cuenta

@@ -83,7 +83,9 @@ export function Modal({
       >
         <div className="dialog-top">
           <h2>{title}</h2>
-          <Button onClick={close}>× Cerrar</Button>
+          <Button tone="secondary" onClick={close}>
+            × Cerrar
+          </Button>
         </div>
         {children}
       </div>
