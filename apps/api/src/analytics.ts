@@ -18,7 +18,7 @@ export async function businessReport(pool: Pool, from: string, to: string) {
  COALESCE((SELECT SUM(p.amount_cop) FROM credit_payments p WHERE p.order_id=o.id AND p.created_at=o.created_at),0) initial_paid
  FROM orders o,bounds b WHERE o.status='delivered' AND NOT o.sale_removed AND o.created_at>=b.start_at AND o.created_at<b.end_at AND (o.payment_status='paid' OR EXISTS(SELECT 1 FROM credit_sales cs WHERE cs.order_id=o.id))
  ), daily AS (
- SELECT (created_at AT TIME ZONE 'America/Bogota')::date day,SUM(total_cop) total,
+ SELECT (created_at AT TIME ZONE 'America/Bogota')::date AS report_day,SUM(total_cop) total,
  SUM(CASE WHEN credit THEN initial_paid ELSE total_cop END) cash,
  SUM(CASE WHEN credit THEN total_cop-initial_paid ELSE 0 END) credit
  FROM sales GROUP BY 1
@@ -34,7 +34,7 @@ export async function businessReport(pool: Pool, from: string, to: string) {
  'salesCop',COALESCE((SELECT SUM(total_cop) FROM sales),0),'saleCount',(SELECT COUNT(*) FROM sales),
  'cashCop',COALESCE((SELECT SUM(cash) FROM daily),0),'creditCop',COALESCE((SELECT SUM(credit) FROM daily),0),
  'paymentsCop',(SELECT total FROM payments),'balanceCop',(SELECT balance FROM debt),
- 'daily',(SELECT COALESCE(jsonb_agg(jsonb_build_object('day',d.day,'totalCop',COALESCE(s.total,0),'cashCop',COALESCE(s.cash,0),'creditCop',COALESCE(s.credit,0)) ORDER BY d.day),'[]'::jsonb) FROM (SELECT generate_series($1::date,$2::date,'1 day')::date day) d LEFT JOIN daily s USING(day)),
+ 'daily',(SELECT COALESCE(jsonb_agg(jsonb_build_object('day',d.report_day,'totalCop',COALESCE(s.total,0),'cashCop',COALESCE(s.cash,0),'creditCop',COALESCE(s.credit,0)) ORDER BY d.report_day),'[]'::jsonb) FROM (SELECT generate_series($1::date,$2::date,'1 day')::date AS report_day) d LEFT JOIN daily s USING(report_day)),
  'topProducts',(SELECT COALESCE(jsonb_agg(jsonb_build_object('name',name,'totalCop',total) ORDER BY total DESC),'[]'::jsonb) FROM tops),
  'inventory',jsonb_build_object('available',(SELECT COUNT(*) FROM products WHERE stock-reserved>minimum),'low',(SELECT COUNT(*) FROM products WHERE stock-reserved>0 AND stock-reserved<=minimum),'out',(SELECT COUNT(*) FROM products WHERE stock-reserved=0))
  ) report`,
