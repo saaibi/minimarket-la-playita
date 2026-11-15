@@ -872,7 +872,9 @@ export function Shop() {
                 {cart.length} líneas en la canasta{" "}
                 <strong>{money(total)}</strong>
               </span>
-              <Button onClick={() => setCartOpen(true)}>Ver canasta</Button>
+              <Button variant="outlined" onClick={() => setCartOpen(true)}>
+                Ver canasta
+              </Button>
             </div>
           )}
         </div>
@@ -1273,9 +1275,6 @@ export function Shop() {
                     : "Enviar pedido"}
             </Button>
           )}
-          <Button disabled={busy} onClick={() => setCartOpen(false)}>
-            Cerrar canasta
-          </Button>
         </Modal>
       )}
       {bellOpen && (

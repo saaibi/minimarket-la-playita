@@ -938,24 +938,33 @@ function Clients({ api }: { api: Api }) {
       <h3>Cuentas de compradores</h3>
       {!message && !accounts.length && <p>No hay compradores registrados.</p>}
       <ul className="customer-list">
-        {accounts.map((c) => (
-          <li key={c.id}>
-            <strong>{c.email || c.phone || "Cliente"}</strong>
-            <small>
-              {c.active ? "Activa" : "Desactivada"} · Crédito{" "}
-              {c.creditEnabled ? "habilitado" : "deshabilitado"}
-            </small>
-            <Button
-              tone="secondary"
-              type="button"
-              onClick={() =>
-                setEditing({ ...c, creditEnabled: !!c.creditEnabled })
-              }
-            >
-              Editar cliente
-            </Button>
-          </li>
-        ))}
+        {[...accounts]
+          .sort((a, b) =>
+            (a.email || a.phone || "").localeCompare(
+              b.email || b.phone || "",
+              "es",
+            ),
+          )
+          .map((c) => (
+            <li className="compact-customer" key={c.id}>
+              <div>
+                <strong>{c.email || c.phone || "Cliente"}</strong>
+                <small>
+                  {c.active ? "Activa" : "Desactivada"} · Crédito{" "}
+                  {c.creditEnabled ? "habilitado" : "deshabilitado"}
+                </small>
+              </div>
+              <Button
+                tone="secondary"
+                type="button"
+                onClick={() =>
+                  setEditing({ ...c, creditEnabled: !!c.creditEnabled })
+                }
+              >
+                Editar
+              </Button>
+            </li>
+          ))}
       </ul>
       {editing && (
         <Modal
@@ -1012,12 +1021,14 @@ function Clients({ api }: { api: Api }) {
       <h3>Contactos guardados</h3>
       {!message && !contacts.length && <p>No hay contactos guardados.</p>}
       <ul className="customer-list">
-        {contacts.map((c) => (
-          <li key={c.id}>
-            <strong>{c.name}</strong>
-            {c.contact && <small>{c.contact}</small>}
-          </li>
-        ))}
+        {[...contacts]
+          .sort((a, b) => a.name.localeCompare(b.name, "es"))
+          .map((c) => (
+            <li key={c.id}>
+              <strong>{c.name}</strong>
+              {c.contact && <small>{c.contact}</small>}
+            </li>
+          ))}
       </ul>
     </section>
   );

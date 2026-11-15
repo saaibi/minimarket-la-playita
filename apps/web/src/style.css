@@ -1794,3 +1794,75 @@ label .MuiInputBase-root {
 .stats .MuiButton-root + .MuiButton-root {
   margin: 0;
 }
+
+/* The basket summary uses a clear outline on the dark brand surface. */
+.cart-dock .MuiButton-root,
+.cart-dock .MuiButton-root:hover,
+.cart-dock .MuiButton-root:active,
+.cart-dock .MuiButton-root:focus-visible {
+  background: transparent;
+  color: #fff;
+  border: 1px solid #ffffffb3;
+  box-shadow: none;
+}
+.cart-dock .MuiButton-root:hover,
+.cart-dock .MuiButton-root:active {
+  background: #ffffff1a;
+}
+.staff-users .compact-account.MuiListItem-root {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 12px 0;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+}
+.compact-account strong,
+.compact-customer strong,
+.customer-list strong {
+  display: block;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.compact-account small,
+.customer-list small {
+  display: block;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  margin-top: 3px;
+  color: var(--muted);
+}
+.compact-account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.compact-account-actions .MuiButton-root {
+  margin: 0;
+}
+.customer-list li {
+  padding: 10px 0;
+}
+.customer-list .compact-customer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+@media (max-width: 600px) {
+  .staff-users .compact-account.MuiListItem-root {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}
+@media (max-width: 600px) {
+  .customer-list .compact-customer {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .customer-list .compact-customer > .MuiButton-root {
+    justify-self: start;
+  }
+}

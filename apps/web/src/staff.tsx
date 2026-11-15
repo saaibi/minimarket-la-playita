@@ -94,52 +94,66 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
       <section className="panel">
         <h2>Cuentas</h2>
         <List disablePadding>
-          {users.map((u) => (
-            <ListItem disableGutters className="row" key={u.id}>
-              <span>
-                {u.email}
-                <small>
-                  {u.role} · {u.active ? "Activa" : "Desactivada"}
-                </small>
-              </span>
-              <Button
-                tone="secondary"
-                type="button"
-                onClick={() => {
-                  setEmail(u.email);
-                  setRole(u.role);
-                  setCreditEnabled(!!u.creditEnabled);
-                }}
+          {[...users]
+            .sort((a, b) => a.email.localeCompare(b.email, "es"))
+            .map((u) => (
+              <ListItem
+                disableGutters
+                className="row compact-account"
+                key={u.id}
               >
-                Editar cuenta
-              </Button>
-              <Button
-                tone="error"
-                disabled={!u.active || u.id === session.actor.id}
-                onClick={() => {
-                  void (async () => {
-                    const r = await auth.request(
-                      `/auth/users/${u.id}/disable`,
-                      {
-                        method: "POST",
-                        body: "{}",
-                      },
-                    );
-                    setMessage(
-                      r.ok
-                        ? "Cuenta desactivada y sesiones revocadas."
-                        : "No se pudo desactivar la cuenta.",
-                    );
-                    await load();
-                  })().catch(() =>
-                    setMessage("No se pudo actualizar la cuenta."),
-                  );
-                }}
-              >
-                Desactivar
-              </Button>
-            </ListItem>
-          ))}
+                <span>
+                  <strong>{u.email}</strong>
+                  <small>
+                    {{
+                      admin: "Administrador",
+                      seller: "Vendedor",
+                      buyer: "Comprador",
+                    }[u.role] || u.role}{" "}
+                    · {u.active ? "Activa" : "Desactivada"} ·{" "}
+                    {u.creditEnabled ? "Con crédito" : "Sin crédito"}
+                  </small>
+                </span>
+                <div className="compact-account-actions">
+                  <Button
+                    tone="secondary"
+                    type="button"
+                    onClick={() => {
+                      setEmail(u.email);
+                      setRole(u.role);
+                      setCreditEnabled(!!u.creditEnabled);
+                    }}
+                  >
+                    Editar
+                  </Button>
+                  <Button
+                    tone="error"
+                    disabled={!u.active || u.id === session.actor.id}
+                    onClick={() => {
+                      void (async () => {
+                        const r = await auth.request(
+                          `/auth/users/${u.id}/disable`,
+                          {
+                            method: "POST",
+                            body: "{}",
+                          },
+                        );
+                        setMessage(
+                          r.ok
+                            ? "Cuenta desactivada y sesiones revocadas."
+                            : "No se pudo desactivar la cuenta.",
+                        );
+                        await load();
+                      })().catch(() =>
+                        setMessage("No se pudo actualizar la cuenta."),
+                      );
+                    }}
+                  >
+                    Desactivar
+                  </Button>
+                </div>
+              </ListItem>
+            ))}
         </List>
       </section>
       <p role="status">{message}</p>
