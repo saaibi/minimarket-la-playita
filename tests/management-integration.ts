@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Pool } from "pg";
+import { businessReport } from "../apps/api/src/analytics.js";
 import { createApp } from "../apps/api/dist/app.js";
 import { bootstrapAdmin } from "../apps/api/src/auth.js";
 import { migrate } from "../scripts/migrate.js";
@@ -288,7 +289,10 @@ test(
           .status,
         400,
       );
-      const reportBeforeRemoval = (await req(reportPath, admin)).data;
+      await businessReport(server.pool, bogotaDate(), bogotaDate());
+      const reportReply = await req(reportPath, admin);
+      assert.equal(reportReply.status, 200);
+      const reportBeforeRemoval = reportReply.data;
       assert.equal(
         reportBeforeRemoval.salesCop,
         reportBeforeRemoval.cashCop + reportBeforeRemoval.creditCop,
