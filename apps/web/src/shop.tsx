@@ -788,6 +788,7 @@ export function Shop() {
             )
             .map(([id, label]) => (
               <Button
+                variant="text"
                 key={id}
                 className={view === id ? "active" : ""}
                 disabled={pendingSale && id !== "pos"}
@@ -830,6 +831,7 @@ export function Shop() {
             </div>
             <div className="header-actions">
               <Button
+                variant="outlined"
                 className="icon-button"
                 aria-label="Ver canasta"
                 onClick={() => setCartOpen(true)}
@@ -840,6 +842,7 @@ export function Shop() {
                 )}
               </Button>
               <Button
+                variant="outlined"
                 className="icon-button"
                 aria-label="Notificaciones"
                 onClick={() => {
@@ -858,7 +861,9 @@ export function Shop() {
                 <strong>{roles[role]}</strong>
                 <small>{session.actor.label}</small>
               </div>
-              <Button onClick={() => void logout()}>Salir</Button>
+              <Button variant="outlined" onClick={() => void logout()}>
+                Salir
+              </Button>
             </div>
           </header>
           {cart.length > 0 && (

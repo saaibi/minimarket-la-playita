@@ -38,8 +38,16 @@ export function AppAppearance({ children }: { children: React.ReactNode }) {
     () =>
       createTheme({
         palette: {
-          primary: { main: "#153e31" },
-          secondary: { main: "#17658d" },
+          primary: { main: "#153e31", contrastText: "#fff" },
+          secondary: {
+            main: "#be4208",
+            light: "#fff3e0",
+            dark: "#8e3005",
+            contrastText: "#fff",
+          },
+          error: { main: "#b3261e", contrastText: "#fff" },
+          info: { main: "#005092" },
+          contrastThreshold: 4.5,
           success: { main: "#35623b" },
           background: { default: "#f6f7f1", paper: "#fff" },
           text: { primary: "#263b33", secondary: "#6b786d" },
@@ -116,16 +124,18 @@ export function Button({
   className = "",
   type = "submit",
   tone = "primary",
+  variant = "contained",
   ...props
 }: Omit<React.ComponentProps<"button">, "color"> & {
   tone?: "primary" | "secondary" | "error";
+  variant?: "contained" | "outlined" | "text";
 }) {
   return (
     <MuiButton
       {...props}
       type={type}
       color={tone}
-      variant="contained"
+      variant={variant}
       className={className}
     />
   );

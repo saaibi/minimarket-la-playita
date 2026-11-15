@@ -85,10 +85,20 @@ export function Inventory({
         )}
       </div>
       <div className="stats">
-        <Button className="stat" onClick={() => setFilter("all")}>
+        <Button
+          variant="outlined"
+          aria-pressed={filter === "all"}
+          className="stat"
+          onClick={() => setFilter("all")}
+        >
           Productos<b>{products.length}</b>
         </Button>
-        <Button className="stat" onClick={() => setFilter("low")}>
+        <Button
+          variant="outlined"
+          aria-pressed={filter === "low"}
+          className="stat"
+          onClick={() => setFilter("low")}
+        >
           Por reponer
           <b>
             {
@@ -98,13 +108,23 @@ export function Inventory({
             }
           </b>
         </Button>
-        <Button className="stat" onClick={() => setFilter("out")}>
+        <Button
+          variant="outlined"
+          aria-pressed={filter === "out"}
+          className="stat"
+          onClick={() => setFilter("out")}
+        >
           Agotados<b>{products.filter((p) => p.available <= 0).length}</b>
         </Button>
-        <Button className="stat" onClick={() => onNavigate("orders")}>
+        <Button
+          variant="outlined"
+          className="stat"
+          onClick={() => onNavigate("orders")}
+        >
           Pedidos por entregar<b>{ordersCount}</b>
         </Button>
         <Button
+          variant="outlined"
           className="stat sales-total-stat"
           onClick={() => onNavigate("history")}
         >

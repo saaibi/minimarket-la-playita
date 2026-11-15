@@ -1730,7 +1730,7 @@ label .MuiInputBase-root {
   color: #fff;
 }
 .MuiButton-containedSecondary {
-  background-color: #17658d;
+  background-color: #be4208;
   color: #fff;
 }
 .MuiButton-containedError {
@@ -1753,4 +1753,44 @@ label .MuiInputBase-root {
 }
 .sidebar nav .MuiButton-root.Mui-disabled {
   color: var(--muted);
+}
+
+/* Every action retains readable contrast when pressed, hovered or focused. */
+.MuiButton-root.MuiButton-containedPrimary:hover,
+.MuiButton-root.MuiButton-containedPrimary:active,
+.MuiButton-root.MuiButton-containedPrimary:focus-visible {
+  background: #153e31;
+  color: #fff;
+}
+.MuiButton-root.MuiButton-containedSecondary:hover,
+.MuiButton-root.MuiButton-containedSecondary:active,
+.MuiButton-root.MuiButton-containedSecondary:focus-visible {
+  background: #be4208;
+  color: #fff;
+}
+.MuiButton-root.MuiButton-containedError:hover,
+.MuiButton-root.MuiButton-containedError:active,
+.MuiButton-root.MuiButton-containedError:focus-visible {
+  background: #b3261e;
+  color: #fff;
+}
+.header-actions .MuiButton-root,
+.stat.MuiButton-root {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: none;
+}
+.header-actions .MuiButton-root:hover,
+.header-actions .MuiButton-root:active,
+.stat.MuiButton-root:hover,
+.stat.MuiButton-root:active,
+.stat.MuiButton-root[aria-pressed="true"],
+.notification-tabs .MuiButton-root[aria-pressed="true"] {
+  background: var(--lime);
+  color: var(--ink);
+  border-color: #90ac86;
+  box-shadow: none;
+}
+.stats .MuiButton-root + .MuiButton-root {
+  margin: 0;
 }
