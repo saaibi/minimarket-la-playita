@@ -1,3 +1,4 @@
+import { LoadingMark } from "./ui.js";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import { Input, Select, Button } from "./material.js";
@@ -18,11 +19,17 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
     [email, setEmail] = useState(""),
     [role, setRole] = useState("seller"),
     [creditEnabled, setCreditEnabled] = useState(false),
-    [message, setMessage] = useState("");
+    [message, setMessage] = useState(""),
+    [loading, setLoading] = useState(true);
   async function load() {
-    const r = await auth.request("/auth/users");
-    if (!r.ok) throw Error("No autorizado");
-    setUsers(await r.json());
+    setLoading(true);
+    try {
+      const r = await auth.request("/auth/users");
+      if (!r.ok) throw Error("No autorizado");
+      setUsers(await r.json());
+    } finally {
+      setLoading(false);
+    }
   }
   useEffect(() => {
     void load().catch(() =>
@@ -93,6 +100,7 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
       </section>
       <section className="panel">
         <h2>Cuentas</h2>
+        {loading && <LoadingMark label="Consultando cuentas…" />}
         <List disablePadding>
           {[...users]
             .sort((a, b) => a.email.localeCompare(b.email, "es"))

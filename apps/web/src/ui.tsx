@@ -9,6 +9,24 @@ export function Brand({ compact = false }: { compact?: boolean }) {
     />
   );
 }
+export function LoadingMark({
+  label = "Cargando información…",
+  small = true,
+}: {
+  label?: string;
+  small?: boolean;
+}) {
+  return (
+    <div
+      className={small ? "loading-mark loading-mark-small" : "loading-mark"}
+      role="status"
+      aria-label={label}
+    >
+      <img src="/assets/marca-cargando.svg" alt="" width="570" height="495" />
+      <span className="sr-only">{label}</span>
+    </div>
+  );
+}
 export function Icon({ name }: { name: string }) {
   const paths: Record<string, string> = {
     detail:

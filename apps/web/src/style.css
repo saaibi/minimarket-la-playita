@@ -1866,3 +1866,20 @@ label .MuiInputBase-root {
     justify-self: start;
   }
 }
+
+.loading-mark {
+  display: grid;
+  place-items: center;
+  width: min(72vw, 260px);
+  margin-inline: auto;
+}
+.loading-mark img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.loading-mark-small {
+  width: 83.2px;
+  max-width: 38vw;
+  margin: 16px auto;
+}

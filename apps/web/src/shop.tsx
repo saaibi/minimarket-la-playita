@@ -26,7 +26,15 @@ import {
   type OutboxRow,
 } from "@playita/mobile";
 import { auth, useSession, native, base } from "./session.js";
-import { Brand, Icon, Modal, money, roles, modulesFor } from "./ui.js";
+import {
+  LoadingMark,
+  Brand,
+  Icon,
+  Modal,
+  money,
+  roles,
+  modulesFor,
+} from "./ui.js";
 import { Inventory, Settings } from "./management.js";
 type Order = {
   id: string;
@@ -879,7 +887,10 @@ export function Shop() {
           )}
         </div>
         <main>
-          {(pullRefresh.distance > 0 || pullRefresh.refreshing) && (
+          {pullRefresh.refreshing && (
+            <LoadingMark label="Actualizando listado…" />
+          )}
+          {pullRefresh.distance > 0 && !pullRefresh.refreshing && (
             <p className="pull-refresh-status" role="status">
               {pullRefresh.refreshing
                 ? "Actualizando listado…"
@@ -888,7 +899,10 @@ export function Shop() {
                   : "Desliza hacia abajo para actualizar"}
             </p>
           )}
-          {message && (
+          {message === "Consultando la tienda…" && (
+            <LoadingMark label={message} />
+          )}
+          {message && message !== "Consultando la tienda…" && (
             <p className="status" role="status">
               {message}
             </p>

@@ -1,3 +1,4 @@
+import { LoadingMark } from "./ui.js";
 import { Button } from "./material.js";
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
@@ -76,15 +77,7 @@ function Root() {
         aria-busy="true"
         aria-label="Comprobando sesión"
       >
-        <div role="status" className="session-loading-mark">
-          <img
-            src="/assets/marca-cargando.svg"
-            alt="Minimarket La Playita"
-            width="570"
-            height="495"
-          />
-          <span className="sr-only">Comprobando sesión…</span>
-        </div>
+        <LoadingMark small={false} label="Comprobando sesión…" />
       </main>
     );
   return (

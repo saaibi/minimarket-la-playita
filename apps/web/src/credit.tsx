@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { openNativeOutbox, type Outbox } from "@playita/mobile";
 import { native, auth } from "./session.js";
 import { Button, Input, Select } from "./material.js";
-import { Modal, money, roles } from "./ui.js";
+import { LoadingMark, Modal, money, roles } from "./ui.js";
 import type { OrderDraft } from "@playita/shared";
 type Pending = { path: string; body: string; key: string };
 const storageKey = (owner: string) => "playita-credit-attempt:" + owner;
@@ -217,7 +217,7 @@ export function Checkout({
           disabled={busy || !!attempt}
           onOpen={() => void loadClients()}
           loading={loading}
-          loadingText="Actualizando cuentas…"
+          loadingText={<LoadingMark label="Actualizando cuentas…" />}
           onChange={(_event, selected) => {
             setClientSearch(selected?.id ? selected.name : "");
             update({ ...current, clientId: selected?.id || "" });
@@ -392,10 +392,16 @@ export function Credits({
     [busy, setBusy] = useState(false),
     [payment, setPayment] = useState<any>(null),
     [amount, setAmount] = useState(""),
-    [attempt, setAttempt] = useState<Pending | null>(null);
+    [attempt, setAttempt] = useState<Pending | null>(null),
+    [loading, setLoading] = useState(true);
   async function load() {
-    setClients(await get(owner, "/credit/clients"));
-    setAttempt(await pending(owner));
+    setLoading(true);
+    try {
+      setClients(await get(owner, "/credit/clients"));
+      setAttempt(await pending(owner));
+    } finally {
+      setLoading(false);
+    }
   }
   useEffect(() => {
     void load().catch((e) => setMessage(e.message));
@@ -432,6 +438,7 @@ export function Credits({
   return (
     <section className="credit-module">
       <h1>Créditos</h1>
+      {loading && <LoadingMark label="Consultando créditos…" />}
       {attempt && (
         <section className="panel">
           <h2>Operación por confirmar</h2>
@@ -603,8 +610,10 @@ export function BuyerProfile({
 }) {
   const [profile, setProfile] = useState<any>(null),
     [orders, setOrders] = useState<any[]>([]),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [loading, setLoading] = useState(true);
   async function load() {
+    setLoading(true);
     try {
       setError("");
       const [p, list] = await Promise.all([
@@ -615,6 +624,8 @@ export function BuyerProfile({
       setOrders(list);
     } catch {
       setError("No se pudo consultar tu cuenta. Vuelve a actualizar.");
+    } finally {
+      setLoading(false);
     }
   }
   useEffect(() => {
@@ -670,6 +681,7 @@ export function BuyerProfile({
   return (
     <section className="buyer-profile">
       <h1>Mi cuenta</h1>
+      {loading && <LoadingMark label="Consultando tu cuenta…" />}
       <Button type="button" onClick={() => void load()}>
         Actualizar mi información
       </Button>

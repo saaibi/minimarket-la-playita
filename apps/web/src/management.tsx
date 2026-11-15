@@ -1,3 +1,4 @@
+import { LoadingMark } from "./ui.js";
 import { TextSizeSettings } from "./material.js";
 import { Button, Input, Select, Textarea } from "./material.js";
 import React, { useEffect, useState } from "react";
@@ -934,7 +935,11 @@ function Clients({ api }: { api: Api }) {
     <section className="panel staff-users">
       <h2>Clientes</h2>
       <p>Consulta de clientes registrados y contactos de la tienda.</p>
-      {message && <p role="status">{message}</p>}
+      {message === "Consultando clientes…" ? (
+        <LoadingMark label={message} />
+      ) : (
+        message && <p role="status">{message}</p>
+      )}
       <h3>Cuentas de compradores</h3>
       {!message && !accounts.length && <p>No hay compradores registrados.</p>}
       <ul className="customer-list">
