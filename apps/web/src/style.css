@@ -1737,3 +1737,20 @@ label .MuiInputBase-root {
   background-color: #b3261e;
   color: #fff;
 }
+
+/* Navigation keeps its original light surface and dark, readable icons. */
+.sidebar nav .MuiButton-root {
+  color: var(--ink);
+  background: transparent;
+  box-shadow: none;
+  margin: 0;
+}
+.sidebar nav .MuiButton-root:hover,
+.sidebar nav .MuiButton-root.active {
+  color: var(--ink);
+  background: var(--lime);
+  box-shadow: none;
+}
+.sidebar nav .MuiButton-root.Mui-disabled {
+  color: var(--muted);
+}
