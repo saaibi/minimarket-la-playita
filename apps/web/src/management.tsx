@@ -1,3 +1,6 @@
+import { InventoryActions } from "./inventory-actions.js";
+import { ReplenishmentOrder } from "./replenishment-order.js";
+import { supplierName } from "./replenishment.js";
 import { AuditHistory } from "./audit-history.js";
 import { LoadingMark } from "./ui.js";
 import { TextSizeSettings } from "./material.js";
@@ -37,6 +40,8 @@ export function Inventory({
   const [search, setSearch] = useState(""),
     [filter, setFilter] = useState("all"),
     [category, setCategory] = useState("all"),
+    [supplier, setSupplier] = useState("all"),
+    [orderOpen, setOrderOpen] = useState(false),
     [edit, setEdit] = useState<Product | null | undefined>(),
     [adjust, setAdjust] = useState<Product | null>(null),
     [delta, setDelta] = useState(""),
@@ -58,6 +63,7 @@ export function Inventory({
             .normalize("NFD")
             .replace(/\p{Diacritic}/gu, ""),
         ) &&
+      (supplier === "all" || supplierName(p) === supplier) &&
       (category === "all" || (p.category || "Despensa") === category) &&
       (filter === "all" ||
         (filter === "low" &&
@@ -84,11 +90,6 @@ export function Inventory({
             entre presentaciones.
           </p>
         </div>
-        {admin && (
-          <Button className="primary" onClick={() => setEdit(null)}>
-            + Nuevo producto
-          </Button>
-        )}
       </div>
       <div className="stats">
         <Button
@@ -155,6 +156,20 @@ export function Inventory({
               <option key={c}>{c}</option>
             ),
           )}
+        </Select>
+        <Select
+          aria-label="Proveedor"
+          value={supplier}
+          onChange={(e) => setSupplier(e.target.value)}
+        >
+          <option value="all">Todos los proveedores</option>
+          {[...new Set(products.map(supplierName))]
+            .sort((a, b) => a.localeCompare(b, "es"))
+            .map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
         </Select>
         <Select
           aria-label="Filtrar inventario"
@@ -296,6 +311,20 @@ export function Inventory({
         <p className="empty">No hay productos para este filtro.</p>
       )}
       <p role="alert">{error}</p>
+      {admin && (
+        <InventoryActions
+          hidden={edit !== undefined || !!adjust || !!audit || orderOpen}
+          onNew={() => setEdit(null)}
+          onOrder={() => setOrderOpen(true)}
+        />
+      )}
+      {admin && orderOpen && (
+        <ReplenishmentOrder
+          products={products}
+          initialSupplier={supplier}
+          close={() => setOrderOpen(false)}
+        />
+      )}
       {edit !== undefined && (
         <ProductEditor
           product={edit}

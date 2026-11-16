@@ -154,8 +154,14 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
       );
       if (role === "admin") {
         await waitFor(() =>
-          assert.ok(view.getByRole("button", { name: /Nuevo producto/ })),
+          assert.ok(
+            view.getByRole("button", { name: "Acciones de inventario" }),
+          ),
         );
+        fireEvent.click(
+          view.getByRole("button", { name: "Acciones de inventario" }),
+        );
+        assert.ok(view.getByRole("button", { name: "Nuevo producto" }));
         fireEvent.click(view.getByRole("button", { name: "Ajustes" }));
         await waitFor(() =>
           assert.ok(view.getByRole("heading", { name: "Cuentas y roles" })),
