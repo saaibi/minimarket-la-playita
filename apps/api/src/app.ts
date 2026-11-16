@@ -456,6 +456,38 @@ class ApiController {
     res.setHeader("Idempotency-Replayed", String(!!r.replayed));
     return res.status(r.status).json(r.body);
   }
+  @Post("credit/clients/:id/payments") async clientCreditPayment(
+    @Req() req: Request,
+    @Param("id") clientId: string,
+    @Body() body: unknown,
+    @Res() res: any,
+  ) {
+    if (req.actor.role === "buyer")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    const parsed = z
+        .object({
+          amountCop: z.number().int().positive().max(2000000000),
+          expectedBalanceCop: z
+            .number()
+            .int()
+            .nonnegative()
+            .max(Number.MAX_SAFE_INTEGER),
+        })
+        .strict()
+        .safeParse(body),
+      id = key(req);
+    if (!parsed.success || !id.success || !z.uuid().safeParse(clientId).success)
+      return res.status(400).json({ code: "VALIDATION_ERROR" });
+    const result = await this.store.clientCreditPayment(
+      req.actor,
+      id.data,
+      clientId,
+      parsed.data.amountCop,
+      parsed.data.expectedBalanceCop,
+    );
+    res.setHeader("Idempotency-Replayed", String(!!result.replayed));
+    return res.status(result.status).json(result.body);
+  }
   @Post("credit/openings/:id/payments") async openingCreditPayment(
     @Req() req: Request,
     @Param("id") orderId: string,

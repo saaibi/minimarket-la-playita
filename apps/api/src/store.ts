@@ -255,24 +255,7 @@ export class Store {
               "El permiso de crédito cambió. Actualiza la cuenta antes de confirmar",
             );
 
-          const debts = (
-            await db.query(
-              "SELECT o.id,o.total_cop FROM orders o JOIN credit_sales s ON s.order_id=o.id WHERE s.client_id=$1 ORDER BY o.created_at,o.id FOR UPDATE OF o",
-              [creditClient.id],
-            )
-          ).rows;
-          let debt = (await openingDebt(db, creditClient.id))?.balance || 0;
-          for (const order of debts) {
-            const paid = Number(
-              (
-                await db.query(
-                  "SELECT COALESCE(SUM(amount_cop),0) AS paid FROM credit_payments WHERE order_id=$1",
-                  [order.id],
-                )
-              ).rows[0].paid,
-            );
-            debt += order.total_cop - paid;
-          }
+          const debt = (await this.lockedClientDebt(db, creditClient.id)).total;
           if (debt !== checkout.expectedBalanceCop)
             throw new Conflict(
               "CREDIT_BALANCE_CHANGED",
@@ -472,77 +455,16 @@ export class Store {
             );
         }
         if (settlement) {
-          const debts = (
-            await db.query(
-              `SELECT o.id,o.total_cop FROM orders o JOIN credit_sales s ON s.order_id=o.id WHERE s.client_id=$1 AND NOT o.sale_removed ORDER BY o.created_at,o.id FOR UPDATE OF o`,
-              [settlement.clientId],
-            )
-          ).rows;
-          let remaining = settlement.amountCop;
-          const opening = await openingDebt(db, settlement.clientId);
-          if (opening && remaining > 0 && opening.balance > 0) {
-            const amount = Math.min(remaining, opening.balance);
-            await db.query(
-              "INSERT INTO credit_opening_payments(id,opening_id,amount_cop,actor_id) VALUES($1,$2,$3,$4)",
-              [randomUUID(), opening.id, amount, actor.id],
-            );
-            await this.audit(
-              db,
-              actor,
-              "credit.opening.payment",
-              opening.id,
-              { balanceCop: opening.balance },
-              {
-                amountCop: amount,
-                balanceCop: opening.balance - amount,
-                checkoutOrderId: id,
-              },
-              "Abono a saldo anterior recibido junto con venta en caja",
-            );
-            remaining -= amount;
-          }
-
-          for (const debt of debts) {
-            const paid = Number(
-              (
-                await db.query(
-                  "SELECT COALESCE(SUM(amount_cop),0) AS paid FROM credit_payments WHERE order_id=$1",
-                  [debt.id],
-                )
-              ).rows[0].paid,
-            );
-            const amount = Math.min(remaining, debt.total_cop - paid);
-            if (amount > 0) {
-              await db.query(
-                "INSERT INTO credit_payments(id,order_id,amount_cop,actor_id) VALUES($1,$2,$3,$4)",
-                [randomUUID(), debt.id, amount, actor.id],
-              );
-              if (amount === debt.total_cop - paid)
-                await db.query(
-                  "UPDATE orders SET payment_status='paid' WHERE id=$1",
-                  [debt.id],
-                );
-              await this.audit(
-                db,
-                actor,
-                "credit.payment",
-                debt.id,
-                { balanceCop: debt.total_cop - paid },
-                {
-                  amountCop: amount,
-                  balanceCop: debt.total_cop - paid - amount,
-                  checkoutOrderId: id,
-                },
-                "Abono recibido junto con venta en caja",
-              );
-              remaining -= amount;
-            }
-          }
-          if (remaining > 0)
-            throw new Conflict(
-              "CREDIT_BALANCE_CHANGED",
-              "El saldo cambió. Revisa el abono antes de confirmar",
-            );
+          const debt = await this.lockedClientDebt(db, settlement.clientId);
+          await this.distributeClientPayment(
+            db,
+            actor,
+            events,
+            settlement.clientId,
+            settlement.amountCop,
+            debt,
+            id,
+          );
         }
         await this.event(
           db,
@@ -657,6 +579,197 @@ export class Store {
         orders.reduce((n, o) => n + o.balanceCop, 0) +
         (opening?.balanceCop || 0),
     };
+  }
+  private async lockedClientDebt(db: PoolClient, clientId: string) {
+    const rows = (
+      await db.query(
+        "SELECT o.id,o.total_cop FROM orders o JOIN credit_sales s ON s.order_id=o.id WHERE s.client_id=$1 AND NOT o.sale_removed ORDER BY o.created_at,o.id FOR UPDATE OF o",
+        [clientId],
+      )
+    ).rows;
+    const orders = [] as { id: string; balance: number }[];
+    for (const row of rows) {
+      const paid = Number(
+        (
+          await db.query(
+            "SELECT COALESCE(SUM(amount_cop),0) paid FROM credit_payments WHERE order_id=$1",
+            [row.id],
+          )
+        ).rows[0].paid,
+      );
+      orders.push({ id: row.id, balance: row.total_cop - paid });
+    }
+    const opening = await openingDebt(db, clientId);
+    return {
+      opening,
+      orders,
+      total:
+        orders.reduce((n, o) => n + o.balance, 0) + (opening?.balance || 0),
+    };
+  }
+  private async distributeClientPayment(
+    db: PoolClient,
+    actor: Actor,
+    events: Record<string, unknown>[],
+    clientId: string,
+    amountCop: number,
+    debt: {
+      opening: any;
+      orders: { id: string; balance: number }[];
+      total: number;
+    },
+    checkoutOrderId?: string,
+  ) {
+    if (amountCop > debt.total)
+      throw new Conflict(
+        "EXCESS_PAYMENT",
+        "El abono supera el saldo pendiente",
+      );
+    let remaining = amountCop;
+    const receiptId = randomUUID(),
+      allocations = [] as {
+        kind: string;
+        id: string;
+        amountCop: number;
+        balanceCop: number;
+      }[];
+    if (debt.opening?.balance > 0) {
+      const amount = Math.min(remaining, debt.opening.balance);
+      if (amount > 0) {
+        await db.query(
+          "INSERT INTO credit_opening_payments(id,opening_id,amount_cop,actor_id) VALUES($1,$2,$3,$4)",
+          [randomUUID(), debt.opening.id, amount, actor.id],
+        );
+        allocations.push({
+          kind: "opening",
+          id: debt.opening.id,
+          amountCop: amount,
+          balanceCop: debt.opening.balance - amount,
+        });
+        await this.audit(
+          db,
+          actor,
+          "credit.opening.payment",
+          debt.opening.id,
+          { balanceCop: debt.opening.balance },
+          {
+            amountCop: amount,
+            balanceCop: debt.opening.balance - amount,
+            receiptId,
+            checkoutOrderId,
+          },
+          "Abono a saldo anterior",
+        );
+        remaining -= amount;
+      }
+    }
+    for (const order of debt.orders) {
+      const amount = Math.min(remaining, order.balance);
+      if (amount > 0) {
+        await db.query(
+          "INSERT INTO credit_payments(id,order_id,amount_cop,actor_id) VALUES($1,$2,$3,$4)",
+          [randomUUID(), order.id, amount, actor.id],
+        );
+        if (amount === order.balance)
+          await db.query(
+            "UPDATE orders SET payment_status='paid' WHERE id=$1",
+            [order.id],
+          );
+        allocations.push({
+          kind: "order",
+          id: order.id,
+          amountCop: amount,
+          balanceCop: order.balance - amount,
+        });
+        await this.audit(
+          db,
+          actor,
+          "credit.payment",
+          order.id,
+          { balanceCop: order.balance },
+          {
+            amountCop: amount,
+            balanceCop: order.balance - amount,
+            receiptId,
+            checkoutOrderId,
+          },
+          "Abono al saldo del cliente",
+        );
+        remaining -= amount;
+      }
+    }
+    if (remaining !== 0)
+      throw new Conflict(
+        "CREDIT_BALANCE_CHANGED",
+        "El saldo cambió. Actualiza el cliente antes de confirmar",
+      );
+    await this.audit(
+      db,
+      actor,
+      "credit.payment.receipt",
+      receiptId,
+      { balanceCop: debt.total },
+      {
+        clientId,
+        amountCop,
+        balanceCop: debt.total - amountCop,
+        allocations,
+        checkoutOrderId,
+      },
+      "Abono único recibido para el cliente",
+    );
+    await this.event(db, events, "credit.updated", null, { clientId });
+    return {
+      id: receiptId,
+      clientId,
+      amountCop,
+      balanceCop: debt.total - amountCop,
+      allocations,
+    };
+  }
+  clientCreditPayment(
+    actor: Actor,
+    key: string,
+    clientId: string,
+    amountCop: number,
+    expectedBalanceCop: number,
+  ) {
+    return this.once(
+      actor,
+      key,
+      {
+        operation: "client-credit-payment",
+        clientId,
+        amountCop,
+        expectedBalanceCop,
+      },
+      async (db, events) => {
+        if (actor.role === "buyer")
+          throw new Conflict("FORBIDDEN", "Solo personal");
+        const client = (
+          await db.query(
+            "SELECT id FROM app_users WHERE id=$1 AND NOT is_guest FOR UPDATE",
+            [clientId],
+          )
+        ).rows[0];
+        if (!client)
+          throw new Conflict("CLIENT_UNAVAILABLE", "Cliente no disponible");
+        const debt = await this.lockedClientDebt(db, clientId);
+        if (debt.total !== expectedBalanceCop)
+          throw new Conflict(
+            "CREDIT_BALANCE_CHANGED",
+            "El saldo cambió. Actualiza el cliente antes de confirmar",
+          );
+        return this.distributeClientPayment(
+          db,
+          actor,
+          events,
+          clientId,
+          amountCop,
+          debt,
+        );
+      },
+    );
   }
   openingCreditPayment(
     actor: Actor,

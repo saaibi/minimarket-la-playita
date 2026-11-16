@@ -62,6 +62,22 @@ test("Crédito: una respuesta perdida conserva solicitud y clave por usuario; ot
     lost = false;
     await creditMutation("seller-a", openingPath, { amountCop: 1000 });
     assert.equal(calls[calls.length - 1].key, openingKey);
+    const clientPath = "/credit/clients/" + crypto.randomUUID() + "/payments";
+    lost = true;
+    await assert.rejects(
+      creditMutation("seller-b", clientPath, {
+        amountCop: 1000,
+        expectedBalanceCop: 5000,
+      }),
+    );
+    const clientKey = calls[calls.length - 1].key;
+    lost = false;
+    await creditMutation("seller-b", clientPath, {
+      amountCop: 1000,
+      expectedBalanceCop: 5000,
+    });
+    assert.equal(calls[calls.length - 1].key, clientKey);
+
     assert.equal(localStorage.getItem("playita-credit-attempt:seller-a"), null);
   } finally {
     auth.request = original;
@@ -361,6 +377,116 @@ test("Contado: general y cuenta sin crédito muestran faltante o cambio sin abon
     fireEvent.click(view.getByRole("button", { name: "Confirmar pago" }));
     await waitFor(() => assert.equal(writes.length, 1));
     assert.equal(writes[0].expectedCreditEnabled, false);
+  } finally {
+    cleanup();
+    auth.request = original;
+    dom.window.close();
+  }
+});
+
+test("Créditos: un único abono al cliente sustituye los botones por compra", async () => {
+  const dom = new JSDOM("<html><body></body></html>", {
+    url: "http://localhost",
+  });
+  Object.assign(globalThis, {
+    window: dom.window,
+    document: dom.window.document,
+    HTMLElement: dom.window.HTMLElement,
+    Element: dom.window.Element,
+    ShadowRoot: dom.window.ShadowRoot,
+    localStorage: dom.window.localStorage,
+    IS_REACT_ACT_ENVIRONMENT: true,
+  });
+  const React = await import("react");
+  const { render, fireEvent, waitFor, cleanup } =
+    await import("@testing-library/react");
+  const { Credits } = await import("../apps/web/src/credit.js");
+  const { auth } = await import("../apps/web/src/session.js");
+  const original = auth.request;
+  const id = crypto.randomUUID(),
+    writes: any[] = [];
+  const client = {
+    id,
+    name: "cliente@example.invalid",
+    role: "buyer",
+    active: true,
+    creditEnabled: true,
+    chargedCop: 9000,
+    paidCop: 0,
+    balanceCop: 9000,
+  };
+  const detail = {
+    ...client,
+    opening: null,
+    orders: [
+      {
+        id: crypto.randomUUID(),
+        createdAt: "2026-01-01T12:00:00Z",
+        totalCop: 4000,
+        paidCop: 0,
+        balanceCop: 4000,
+        lines: [],
+        payments: [],
+      },
+      {
+        id: crypto.randomUUID(),
+        createdAt: "2026-01-02T12:00:00Z",
+        totalCop: 5000,
+        paidCop: 0,
+        balanceCop: 5000,
+        lines: [],
+        payments: [],
+      },
+    ],
+  };
+  auth.request = async (path, init) => {
+    if (init?.method === "POST") {
+      writes.push({ path, body: JSON.parse(String(init.body)) });
+      client.balanceCop = 4500;
+      client.paidCop = 4500;
+      detail.balanceCop = 4500;
+      detail.orders[0]!.balanceCop = 0;
+      detail.orders[1]!.balanceCop = 4500;
+      return Response.json({ balanceCop: 4500 }, { status: 201 });
+    }
+    return Response.json(path === "/credit/clients" ? [client] : detail);
+  };
+  try {
+    const view = render(
+      React.createElement(Credits, {
+        owner: "seller-unified",
+        onChange: async () => {},
+      }),
+    );
+    await waitFor(() =>
+      assert.ok(view.getByRole("button", { name: "Ver pedidos y abonos" })),
+    );
+    fireEvent.click(view.getByRole("button", { name: "Ver pedidos y abonos" }));
+    await waitFor(() =>
+      assert.equal(
+        view.getAllByRole("button", { name: "Registrar abono" }).length,
+        1,
+      ),
+    );
+    assert.equal(
+      view.queryByRole("button", {
+        name: "Registrar abono recibido",
+      }),
+      null,
+    );
+    fireEvent.click(view.getByRole("button", { name: "Registrar abono" }));
+    fireEvent.change(view.getByLabelText("Abono recibido (COP)"), {
+      target: { value: "4500" },
+    });
+    fireEvent.click(
+      view.getByRole("button", { name: "Confirmar abono recibido" }),
+    );
+    await waitFor(() => assert.equal(writes.length, 1));
+    assert.equal(writes[0].path, "/credit/clients/" + id + "/payments");
+    assert.deepEqual(writes[0].body, {
+      amountCop: 4500,
+      expectedBalanceCop: 9000,
+    });
   } finally {
     cleanup();
     auth.request = original;

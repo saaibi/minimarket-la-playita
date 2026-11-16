@@ -1332,6 +1332,130 @@ test(
         ).openingBalance.amountCop,
         3000,
       );
+      const unifiedClient = createdWithOpening.data.id;
+      const inventoryBeforeUnified = (await req("/inventory", admin)).data;
+      const unifiedOrders = [crypto.randomUUID(), crypto.randomUUID()];
+      for (let i = 0; i < 2; i++) {
+        await server.pool.query(
+          "INSERT INTO orders(id,owner_id,status,payment_method,payment_status,total_cop,created_at) VALUES($1,$2,'delivered','cash','pending',$3,$4)",
+          [
+            unifiedOrders[i],
+            unifiedClient,
+            i === 0 ? 4000 : 6000,
+            `2020-01-0${i + 1}T12:00:00Z`,
+          ],
+        );
+        await server.pool.query(
+          "INSERT INTO credit_sales(order_id,client_id) VALUES($1,$2)",
+          [unifiedOrders[i], unifiedClient],
+        );
+      }
+      const unifiedPath = "/credit/clients/" + unifiedClient + "/payments";
+      const beforeUnifiedReport = (await req(reportPath, admin)).data;
+      assert.equal(
+        (
+          await req(unifiedPath, registeredBuyer, "POST", {
+            amountCop: 5000,
+            expectedBalanceCop: 13000,
+          })
+        ).status,
+        403,
+      );
+      assert.equal(
+        (
+          await req(unifiedPath, seller, "POST", {
+            amountCop: 5000,
+            expectedBalanceCop: 13001,
+          })
+        ).status,
+        409,
+      );
+      assert.equal(
+        (
+          await req(unifiedPath, seller, "POST", {
+            amountCop: 13001,
+            expectedBalanceCop: 13000,
+          })
+        ).status,
+        409,
+      );
+      const unifiedKey = crypto.randomUUID();
+      const unifiedFirst = await req(
+        unifiedPath,
+        seller,
+        "POST",
+        { amountCop: 5000, expectedBalanceCop: 13000 },
+        unifiedKey,
+      );
+      assert.equal(unifiedFirst.status, 201);
+      assert.equal(unifiedFirst.data.balanceCop, 8000);
+      assert.deepEqual(
+        unifiedFirst.data.allocations.map((a: any) => a.amountCop),
+        [3000, 2000],
+      );
+      assert.equal(
+        (
+          await req(
+            unifiedPath,
+            seller,
+            "POST",
+            { amountCop: 5000, expectedBalanceCop: 13000 },
+            unifiedKey,
+          )
+        ).replayed,
+        "true",
+      );
+      const unifiedSecond = await req(unifiedPath, admin, "POST", {
+        amountCop: 4500,
+        expectedBalanceCop: 8000,
+      });
+      assert.equal(unifiedSecond.status, 201);
+      assert.deepEqual(
+        unifiedSecond.data.allocations.map((a: any) => a.amountCop),
+        [2000, 2500],
+      );
+      const unifiedDetail = (
+        await req("/credit/clients/" + unifiedClient, seller)
+      ).data;
+      assert.equal(unifiedDetail.opening.balanceCop, 0);
+      assert.equal(
+        unifiedDetail.orders.find((o: any) => o.id === unifiedOrders[0])
+          .balanceCop,
+        0,
+      );
+      assert.equal(
+        unifiedDetail.orders.find((o: any) => o.id === unifiedOrders[1])
+          .balanceCop,
+        3500,
+      );
+      const concurrentUnified = await Promise.all([
+        req(unifiedPath, seller, "POST", {
+          amountCop: 3000,
+          expectedBalanceCop: 3500,
+        }),
+        req(unifiedPath, seller, "POST", {
+          amountCop: 3000,
+          expectedBalanceCop: 3500,
+        }),
+      ]);
+      assert.deepEqual(
+        concurrentUnified.map((r) => r.status).sort(),
+        [201, 409],
+      );
+      assert.equal(
+        (await req("/credit/clients/" + unifiedClient, seller)).data.balanceCop,
+        500,
+      );
+      assert.deepEqual(
+        (await req("/inventory", admin)).data,
+        inventoryBeforeUnified,
+      );
+      const afterUnifiedReport = (await req(reportPath, admin)).data;
+      assert.equal(afterUnifiedReport.salesCop, beforeUnifiedReport.salesCop);
+      assert.equal(
+        afterUnifiedReport.paymentsCop - beforeUnifiedReport.paymentsCop,
+        12500,
+      );
       assert.equal((await req("/audit?page=1", seller)).status, 403);
       assert.equal((await req("/audit?page=-1", admin)).status, 400);
       const auditBeforePaging = (await req("/audit?page=1", admin)).data;

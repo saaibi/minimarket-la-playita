@@ -16,7 +16,7 @@ function browserPending(owner: string): Pending | null {
   if (
     typeof p.body !== "string" ||
     typeof p.key !== "string" ||
-    !/^\/credit\/(checkout|sales|(?:sales|openings)\/[0-9a-f-]+\/payments)$/.test(
+    !/^\/credit\/(checkout|sales|(?:sales|openings|clients)\/[0-9a-f-]+\/payments)$/.test(
       p.path,
     )
   )
@@ -517,16 +517,22 @@ export function Credits({
       {detail && !payment && (
         <Modal title={"Crédito · " + detail.name} close={() => setDetail(null)}>
           <p className="price">Debe: {money(detail.balanceCop)}</p>
-          {detail.opening && (
-            <OpeningBalanceDetails
-              value={detail.opening}
+          {detail.balanceCop > 0 && (
+            <Button
               disabled={busy || !!attempt}
-              onPayment={() => {
-                setPayment({ ...detail.opening, opening: true });
+              onClick={() => {
+                setPayment({ id: detail.id, balanceCop: detail.balanceCop });
                 setAmount("");
               }}
-            />
+            >
+              Registrar abono
+            </Button>
           )}
+          <p>
+            El abono se aplica al saldo anterior y después a las compras más
+            antiguas.
+          </p>
+          {detail.opening && <OpeningBalanceDetails value={detail.opening} />}
           {detail.orders.map((o: any) => (
             <article className="panel" key={o.id}>
               <h3>
@@ -553,24 +559,13 @@ export function Credits({
                   })}
                 </small>
               ))}
-              {o.balanceCop > 0 && (
-                <Button
-                  disabled={busy || !!attempt}
-                  onClick={() => {
-                    setPayment(o);
-                    setAmount("");
-                  }}
-                >
-                  Registrar abono recibido
-                </Button>
-              )}
             </article>
           ))}
         </Modal>
       )}
       {payment && (
         <Modal
-          title="Abono en efectivo"
+          title="Registrar abono del cliente"
           close={() => {
             if (!busy) setPayment(null);
           }}
@@ -579,18 +574,19 @@ export function Credits({
             onSubmit={(e) => {
               e.preventDefault();
               void mutate(
-                "/credit/" +
-                  (payment.opening ? "openings/" : "sales/") +
-                  payment.id +
-                  "/payments",
-                { amountCop: Number(amount) },
+                "/credit/clients/" + payment.id + "/payments",
+                {
+                  amountCop: Number(amount),
+                  expectedBalanceCop: payment.balanceCop,
+                },
                 () => setPayment(null),
               );
             }}
           >
             <p>
-              Cliente: {detail?.name}. Saldo {money(payment.balanceCop)}.
-              Confirma solo después de recibir el efectivo.
+              Cliente: {detail?.name}. Saldo {money(payment.balanceCop)}. Se
+              repartirá automáticamente entre sus saldos pendientes. Confirma
+              solo después de recibir el efectivo.
             </p>
             <label>
               Abono recibido (COP)

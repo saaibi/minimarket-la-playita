@@ -9,3 +9,9 @@ Administrador y vendedor pueden recibir abonos. Se bloquea la cuenta al aplicar 
 Créditos y Mi cuenta muestran el saldo anterior y sus abonos en un bloque separado. El resumen de negocio suma su saldo pendiente en cartera y sus abonos en cobros posteriores, pero no en ventas, productos vendidos ni en la torta contado/crédito al vender.
 
 Se retiró de Ajustes el apartado vacío Contactos guardados. No se borraron registros de contactos de la base de datos.
+
+## Abono único por cliente
+
+En Créditos, el detalle del cliente ofrece un único botón «Registrar abono». El importe se reparte primero al saldo anterior y después a las compras más antiguas, completando cada saldo antes de pasar al siguiente. Se mantiene el historial de lo aplicado a cada deuda y un registro auditable del total recibido.
+
+`POST /credit/clients/:id/payments` requiere un importe y el saldo esperado, además de clave de idempotencia. Está limitado a administrador y vendedor, rechaza importes que excedan la deuda y cambios de saldo concurrentes. Comparte el reparto de la canasta; no modifica existencias ni cuenta como venta nueva. Los endpoints de abonos por pedido y saldo anterior se conservan para APK anteriores, pero la interfaz nueva usa el abono único. Los intentos pendientes de esta ruta también se conservan con la infraestructura SQLite existente, sin cambios de esquema local.

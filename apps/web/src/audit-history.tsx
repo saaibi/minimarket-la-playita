@@ -3,6 +3,7 @@ import type { Api } from "./management.js";
 import { Button } from "./material.js";
 import { LoadingMark } from "./ui.js";
 const labels: Record<string, string> = {
+  "credit.payment.receipt": "Abono único del cliente",
   "credit.opening": "Saldo anterior registrado",
   "credit.opening.payment": "Abono a saldo anterior",
   "account.credit": "Cliente y crédito",
