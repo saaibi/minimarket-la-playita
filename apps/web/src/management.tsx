@@ -169,7 +169,7 @@ export function Inventory({
         <table className="inventory-table">
           <thead>
             <tr>
-              <th>Imagen</th>
+              <th>Foto</th>
               <th>Producto</th>
               <th>Físico</th>
               <th>Reservado</th>
