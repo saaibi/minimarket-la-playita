@@ -1096,6 +1096,28 @@ test(
         ).rows[0].n,
         1,
       );
+      assert.equal((await req("/audit?page=1", seller)).status, 403);
+      assert.equal((await req("/audit?page=-1", admin)).status, 400);
+      const auditBeforePaging = (await req("/audit?page=1", admin)).data;
+      await server.pool.query(
+        "INSERT INTO inventory_audit(actor_id,kind,entity_id,reason) SELECT 'test','stock.adjusted','test','Paginación de prueba' FROM generate_series(1,205)",
+      );
+      const auditOne = (await req("/audit?page=1", admin)).data;
+      const auditTwo = (await req("/audit?page=2", admin)).data;
+      assert.equal(auditOne.total, auditBeforePaging.total + 205);
+      assert.equal(auditOne.pageSize, 50);
+      assert.equal(auditOne.items.length, 50);
+      assert.equal(auditTwo.items.length, 50);
+      assert.equal(
+        new Set([...auditOne.items, ...auditTwo.items].map((r: any) => r.id))
+          .size,
+        100,
+      );
+      const auditLastPage = Math.ceil(auditOne.total / 50);
+      assert.ok(
+        (await req("/audit?page=" + auditLastPage, admin)).data.items.length >
+          0,
+      );
       const salesBeforePaging = (await req("/sales?page=1", admin)).data;
       await server.pool.query(
         "INSERT INTO orders(id,owner_id,status,payment_method,payment_status,total_cop) SELECT gen_random_uuid(),$1,'delivered','cash','paid',0 FROM generate_series(1,105)",

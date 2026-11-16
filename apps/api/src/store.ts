@@ -897,6 +897,14 @@ export class Store {
     );
   }
 
+  async auditPage(page: number) {
+    const { rows } = await this.pool.query(
+      `WITH paged AS (SELECT id,actor_id AS "actorId",kind,entity_id AS "entityId",before_data AS before,after_data AS after,reason,created_at AS "createdAt" FROM inventory_audit ORDER BY id DESC LIMIT 50 OFFSET $1)
+      SELECT (SELECT count(*)::int FROM inventory_audit) total, (SELECT COALESCE(jsonb_agg(p ORDER BY p.id DESC),'[]'::jsonb) FROM paged p) items`,
+      [(page - 1) * 50],
+    );
+    return { page, pageSize: 50, ...rows[0] };
+  }
   async audits() {
     return (
       await this.pool.query(

@@ -2050,3 +2050,24 @@ label .MuiInputBase-root {
     grid-row: span 2;
   }
 }
+.audit-table th,
+.audit-table td {
+  padding: 8px 10px;
+  vertical-align: top;
+}
+.audit-table td:first-child {
+  min-width: 110px;
+  max-width: 130px;
+}
+.audit-table td:nth-child(3) {
+  min-width: 180px;
+  max-width: 280px;
+  overflow-wrap: anywhere;
+}
+.audit-table details pre {
+  max-width: 320px;
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

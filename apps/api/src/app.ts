@@ -181,10 +181,17 @@ class ApiController {
       this.store.saveClient(req.actor, k, id, v, false),
     );
   }
-  @Get("audit") async audit(@Req() req: Request, @Res() res: any) {
+  @Get("audit") async audit(
+    @Req() req: Request,
+    @Query("page") page: string | undefined,
+    @Res() res: any,
+  ) {
     if (req.actor.role !== "admin")
       return res.status(403).json({ code: "FORBIDDEN" });
-    return res.json(await this.store.audits());
+    if (page === undefined) return res.json(await this.store.audits());
+    const parsed = z.coerce.number().int().min(1).max(100000).safeParse(page);
+    if (!parsed.success) return res.status(400).json({ code: "INVALID_PAGE" });
+    return res.json(await this.store.auditPage(parsed.data));
   }
   @Get("notifications") notifications(@Req() req: Request) {
     return this.store.notifications(req.actor);

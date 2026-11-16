@@ -1,3 +1,4 @@
+import { AuditHistory } from "./audit-history.js";
 import { LoadingMark } from "./ui.js";
 import { TextSizeSettings } from "./material.js";
 import { Button, Input, Select, Textarea } from "./material.js";
@@ -976,7 +977,7 @@ export function Settings({
       )}
       <StaffUsers embedded />
       <Clients api={api} />
-      <AuditSettings api={api} />
+      <AuditHistory api={api} />
     </>
   );
 }
@@ -1145,93 +1146,6 @@ function Clients({ api }: { api: Api }) {
             </li>
           ))}
       </ul>
-    </section>
-  );
-}
-function AuditSettings({ api }: { api: Api }) {
-  const [rows, setRows] = useState<any[]>([]),
-    [error, setError] = useState("");
-  async function load() {
-    try {
-      setRows(await api("/audit"));
-    } catch {
-      setError("No se pudo consultar la trazabilidad");
-    }
-  }
-  useEffect(() => {
-    void load();
-  }, []);
-  return (
-    <section className="panel">
-      <h2>Ajustes de inventario y trazabilidad</h2>
-      <p>
-        Cada cambio conserva motivo, responsable y antes/después. Últimos 200
-        movimientos.
-      </p>
-      <Button tone="secondary" onClick={() => void load()}>
-        Actualizar movimientos
-      </Button>
-      {rows.map((r) => (
-        <article className="audit" key={r.id}>
-          <strong>
-            {r.kind === "account.credit"
-              ? "Permiso de crédito"
-              : r.kind === "account.role"
-                ? "Cuenta y rol"
-                : r.kind === "stock.adjusted"
-                  ? "Ajuste de existencias y precios"
-                  : r.kind === "sale"
-                    ? "Venta de caja"
-                    : r.kind === "product.created"
-                      ? "Producto creado"
-                      : r.kind === "product.updated"
-                        ? "Producto editado"
-                        : r.kind === "schedule"
-                          ? "Horario actualizado"
-                          : r.kind}
-          </strong>
-          <p>{r.reason}</p>
-          {r.kind === "sale.removed" && (
-            <Button
-              type="button"
-              onClick={() =>
-                void api("/sales/" + r.entityId + "/removal", {
-                  method: "POST",
-                  headers: { "Idempotency-Key": crypto.randomUUID() },
-                  body: JSON.stringify({
-                    removed: false,
-                    reason:
-                      "Restauración de registro de venta retirado; inventario sin cambios",
-                  }),
-                })
-                  .then(load)
-                  .catch(() =>
-                    setError(
-                      "No se pudo restaurar. Puede que el registro ya esté restaurado.",
-                    ),
-                  )
-              }
-            >
-              Restaurar registro de venta
-            </Button>
-          )}
-
-          <small>
-            {new Date(r.createdAt).toLocaleString("es-CO", {
-              timeZone: "America/Bogota",
-            })}{" "}
-            · Responsable {r.actorId.slice(0, 8)}
-          </small>
-          <details>
-            <summary>Ver antes y después</summary>
-            <pre>
-              {JSON.stringify({ antes: r.before, despues: r.after }, null, 2)}
-            </pre>
-          </details>
-        </article>
-      ))}
-      {!rows.length && <p className="empty">Sin movimientos registrados.</p>}
-      <p role="alert">{error}</p>
     </section>
   );
 }
