@@ -1,3 +1,8 @@
+import {
+  openingBalanceSchema,
+  recordOpeningCredit,
+  OpeningCreditError,
+} from "./opening-credit.js";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import {
@@ -620,7 +625,7 @@ export class AuthService {
         return res.json(
           (
             await this.pool.query(
-              'SELECT id,email,phone,active,credit_enabled AS "creditEnabled",created_at AS "createdAt" FROM app_users WHERE role=\'buyer\' AND NOT is_guest ORDER BY created_at',
+              "SELECT id,email,phone,active,(SELECT jsonb_build_object('id',o.id,'amountCop',o.amount_cop,'note',o.reason) FROM credit_openings o WHERE o.client_id=app_users.id) AS \"openingBalance\",credit_enabled AS \"creditEnabled\",created_at AS \"createdAt\" FROM app_users WHERE role='buyer' AND NOT is_guest ORDER BY created_at",
             )
           ).rows,
         );
@@ -633,6 +638,7 @@ export class AuthService {
             email,
             role: z.enum(["admin", "seller", "buyer"]),
             creditEnabled: z.boolean().optional(),
+            openingBalance: openingBalanceSchema.optional(),
           })
           .strict()
           .parse(body);
@@ -678,6 +684,13 @@ export class AuthService {
                   ],
                 )
               ).rows[0];
+          await recordOpeningCredit(
+            db,
+            s.actor.id,
+            user.id,
+            user.creditEnabled,
+            input.openingBalance,
+          );
           if (existing && existing.role !== input.role) {
             const families = (
               await db.query(
@@ -722,7 +735,11 @@ export class AuthService {
           throw new AuthError(403, "FORBIDDEN");
         const id = z.uuid().parse(path.split("/")[3]);
         const input = z
-          .object({ creditEnabled: z.boolean(), email: email.optional() })
+          .object({
+            creditEnabled: z.boolean(),
+            email: email.optional(),
+            openingBalance: openingBalanceSchema.optional(),
+          })
           .strict()
           .parse(body);
         const db = await this.pool.connect();
@@ -740,6 +757,13 @@ export class AuthService {
           await db.query(
             "UPDATE app_users SET credit_enabled=$2,email=COALESCE($3,email) WHERE id=$1",
             [id, input.creditEnabled, input.email ?? null],
+          );
+          await recordOpeningCredit(
+            db,
+            session.actor.id,
+            id,
+            input.creditEnabled,
+            input.openingBalance,
           );
           await db.query(
             "INSERT INTO inventory_audit(actor_id,kind,entity_id,before_data,after_data,reason) VALUES($1,'account.credit',$2,$3,$4,'Permiso de crédito por administrador')",
@@ -770,7 +794,7 @@ export class AuthService {
           return res.json(
             (
               await this.pool.query(
-                "SELECT id,email,role,active,credit_enabled AS \"creditEnabled\" FROM app_users WHERE role IN ('admin','seller') ORDER BY created_at",
+                "SELECT id,email,role,active,(SELECT jsonb_build_object('id',o.id,'amountCop',o.amount_cop,'note',o.reason) FROM credit_openings o WHERE o.client_id=app_users.id) AS \"openingBalance\",credit_enabled AS \"creditEnabled\" FROM app_users WHERE role IN ('admin','seller') ORDER BY created_at",
               )
             ).rows,
           );
@@ -840,6 +864,8 @@ export class AuthService {
       }
       return res.status(404).json({ code: "NOT_FOUND" });
     } catch (e) {
+      if (e instanceof OpeningCreditError)
+        return res.status(409).json({ code: e.code });
       if (e instanceof AuthError)
         return res.status(e.status).json({
           code: e.code,

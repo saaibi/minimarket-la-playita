@@ -1096,6 +1096,239 @@ test(
         ).rows[0].n,
         1,
       );
+      // Historical debt is not a sale, never changes stock, and can receive safe payments.
+      const beforeOpening = (
+        await req("/credit/clients/" + creditCustomer.id, seller)
+      ).data;
+      const inventoryBeforeOpening = (await req("/inventory", admin)).data;
+      const reportBeforeOpening = (await req(reportPath, admin)).data;
+      const openingInput = {
+        creditEnabled: true,
+        openingBalance: {
+          amountCop: 5000,
+          note: "Deuda previa al uso de la app",
+        },
+      };
+      assert.equal(
+        (await req(permissionPath, seller, "POST", openingInput)).status,
+        403,
+      );
+      assert.equal(
+        (
+          await req(permissionPath, admin, "POST", {
+            ...openingInput,
+            creditEnabled: false,
+          })
+        ).status,
+        409,
+      );
+      assert.equal(
+        (await req(permissionPath, admin, "POST", openingInput)).status,
+        200,
+      );
+      assert.equal(
+        (await req(permissionPath, admin, "POST", openingInput)).status,
+        200,
+      );
+      assert.equal(
+        (
+          await req(permissionPath, admin, "POST", {
+            ...openingInput,
+            openingBalance: { ...openingInput.openingBalance, amountCop: 6000 },
+          })
+        ).status,
+        409,
+      );
+      const withOpening = (
+        await req("/credit/clients/" + creditCustomer.id, seller)
+      ).data;
+      assert.equal(withOpening.balanceCop, beforeOpening.balanceCop + 5000);
+      assert.equal(withOpening.opening.totalCop, 5000);
+      assert.deepEqual(withOpening.orders, beforeOpening.orders);
+      assert.equal(
+        (await req("/credit/me", registeredBuyer)).data.opening.id,
+        withOpening.opening.id,
+      );
+      assert.deepEqual(
+        (await req("/inventory", admin)).data,
+        inventoryBeforeOpening,
+      );
+      const afterOpeningReport = (await req(reportPath, admin)).data;
+      assert.equal(afterOpeningReport.salesCop, reportBeforeOpening.salesCop);
+      assert.equal(afterOpeningReport.saleCount, reportBeforeOpening.saleCount);
+      assert.equal(
+        afterOpeningReport.balanceCop,
+        reportBeforeOpening.balanceCop + 5000,
+      );
+      const openingPaymentPath =
+        "/credit/openings/" + withOpening.opening.id + "/payments";
+      assert.equal(
+        (
+          await req(openingPaymentPath, registeredBuyer, "POST", {
+            amountCop: 1000,
+          })
+        ).status,
+        403,
+      );
+      assert.equal(
+        (await req(openingPaymentPath, seller, "POST", { amountCop: 5001 }))
+          .status,
+        409,
+      );
+      const openingPayKey = crypto.randomUUID();
+      assert.equal(
+        (
+          await req(
+            openingPaymentPath,
+            seller,
+            "POST",
+            { amountCop: 1000 },
+            openingPayKey,
+          )
+        ).status,
+        201,
+      );
+      assert.equal(
+        (
+          await req(
+            openingPaymentPath,
+            seller,
+            "POST",
+            { amountCop: 1000 },
+            openingPayKey,
+          )
+        ).replayed,
+        "true",
+      );
+      const afterOpeningPayment = (
+        await req("/credit/clients/" + creditCustomer.id, seller)
+      ).data;
+      assert.equal(afterOpeningPayment.opening.balanceCop, 4000);
+      assert.equal(afterOpeningPayment.opening.payments.length, 1);
+      const openingReportPaid = (await req(reportPath, admin)).data;
+      assert.equal(openingReportPaid.salesCop, reportBeforeOpening.salesCop);
+      assert.equal(
+        openingReportPaid.paymentsCop,
+        reportBeforeOpening.paymentsCop + 1000,
+      );
+      assert.deepEqual(
+        (await req("/inventory", admin)).data,
+        inventoryBeforeOpening,
+      );
+      const openingCheckout = {
+        mode: "auto",
+        clientId: creditCustomer.id,
+        lines: autoLines,
+        cashReceived: 1500,
+        expectedTotalCop: 1000,
+        expectedBalanceCop: afterOpeningPayment.balanceCop,
+        expectedCreditEnabled: true,
+      };
+      assert.equal(
+        (
+          await req("/credit/checkout", seller, "POST", {
+            ...openingCheckout,
+            expectedBalanceCop: afterOpeningPayment.balanceCop + 1,
+          })
+        ).status,
+        409,
+      );
+      const openingCheckoutKey = crypto.randomUUID();
+      assert.equal(
+        (
+          await req(
+            "/credit/checkout",
+            seller,
+            "POST",
+            openingCheckout,
+            openingCheckoutKey,
+          )
+        ).status,
+        201,
+      );
+      assert.equal(
+        (
+          await req(
+            "/credit/checkout",
+            seller,
+            "POST",
+            openingCheckout,
+            openingCheckoutKey,
+          )
+        ).replayed,
+        "true",
+      );
+      assert.equal(
+        (await req("/credit/clients/" + creditCustomer.id, seller)).data.opening
+          .balanceCop,
+        3500,
+      );
+      const concurrentOpeningPays = await Promise.all([
+        req(openingPaymentPath, seller, "POST", { amountCop: 3000 }),
+        req(openingPaymentPath, seller, "POST", { amountCop: 3000 }),
+      ]);
+      assert.deepEqual(
+        concurrentOpeningPays.map((r) => r.status).sort(),
+        [201, 409],
+      );
+      assert.equal(
+        (await req("/credit/clients/" + creditCustomer.id, seller)).data.opening
+          .balanceCop,
+        500,
+      );
+      await req(permissionPath, admin, "POST", { creditEnabled: false });
+      assert.equal(
+        (await req(openingPaymentPath, seller, "POST", { amountCop: 500 }))
+          .status,
+        201,
+      );
+      assert.equal(
+        (await req("/credit/clients/" + creditCustomer.id, seller)).data.opening
+          .balanceCop,
+        0,
+      );
+      assert.equal(
+        (
+          await req("/auth/users/assign-role", admin, "POST", {
+            email: "opening-denied@example.invalid",
+            role: "buyer",
+            creditEnabled: false,
+            openingBalance: { amountCop: 3000, note: "Deuda previa" },
+          })
+        ).status,
+        409,
+      );
+      assert.equal(
+        (
+          await server.pool.query(
+            "SELECT id FROM app_users WHERE email='opening-denied@example.invalid'",
+          )
+        ).rowCount,
+        0,
+      );
+      const createdWithOpening = await req(
+        "/auth/users/assign-role",
+        admin,
+        "POST",
+        {
+          email: "opening-new@example.invalid",
+          role: "buyer",
+          creditEnabled: true,
+          openingBalance: { amountCop: 3000, note: "Deuda previa" },
+        },
+      );
+      assert.equal(createdWithOpening.status, 201);
+      assert.equal(
+        (await req("/credit/clients/" + createdWithOpening.data.id, seller))
+          .data.balanceCop,
+        3000,
+      );
+      assert.equal(
+        (await req("/auth/customers", admin)).data.find(
+          (c: any) => c.id === createdWithOpening.data.id,
+        ).openingBalance.amountCop,
+        3000,
+      );
       assert.equal((await req("/audit?page=1", seller)).status, 403);
       assert.equal((await req("/audit?page=-1", admin)).status, 400);
       const auditBeforePaging = (await req("/audit?page=1", admin)).data;

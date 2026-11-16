@@ -53,6 +53,16 @@ test("Crédito: una respuesta perdida conserva solicitud y clave por usuario; ot
     assert.equal(calls[0].key, calls[2].key);
     assert.equal(calls[0].body, calls[2].body);
     assert.equal(localStorage.getItem("playita-credit-attempt:seller-a"), null);
+    const openingPath = "/credit/openings/" + crypto.randomUUID() + "/payments";
+    lost = true;
+    await assert.rejects(
+      creditMutation("seller-a", openingPath, { amountCop: 1000 }),
+    );
+    const openingKey = calls[calls.length - 1].key;
+    lost = false;
+    await creditMutation("seller-a", openingPath, { amountCop: 1000 });
+    assert.equal(calls[calls.length - 1].key, openingKey);
+    assert.equal(localStorage.getItem("playita-credit-attempt:seller-a"), null);
   } finally {
     auth.request = original;
     dom.window.close();

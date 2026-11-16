@@ -61,10 +61,15 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
     overrideDate: "2000-01-01",
     version: 0,
   };
+  let assignedAccount: any;
   let inventoryReads = 0,
     noticeReadWrites = 0;
   globalThis.fetch = async (input, init) => {
     const path = String(input);
+    if (path.endsWith("/auth/users/assign-role")) {
+      assignedAccount = JSON.parse(String(init?.body));
+      return Response.json({ ok: true });
+    }
     if (path.endsWith("/auth/login") || path.endsWith("/auth/guest"))
       return Response.json({
         actor: {
@@ -167,6 +172,25 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
           assert.ok(view.getByRole("heading", { name: "Cuentas y roles" })),
         );
         assert.ok(view.getByRole("heading", { name: "Clientes" }));
+        assert.equal(
+          view.queryByRole("heading", { name: "Contactos guardados" }),
+          null,
+        );
+        fireEvent.change(view.getByLabelText("Correo", { exact: true }), {
+          target: { value: "historical@example.invalid" },
+        });
+        fireEvent.click(view.getByLabelText("Permitir compras a crédito"));
+        fireEvent.change(
+          view.getByLabelText("Valor pendiente anterior (COP)"),
+          { target: { value: "12345" } },
+        );
+        fireEvent.click(view.getByRole("button", { name: "Guardar cuenta" }));
+        await waitFor(() =>
+          assert.equal(assignedAccount?.openingBalance?.amountCop, 12345),
+        );
+        assert.equal(assignedAccount.creditEnabled, true);
+        await waitFor(() => assert.ok(view.getByText(/Cuenta guardada/)));
+
         assert.ok(view.getByRole("heading", { name: "Horario · Bogotá" }));
         fireEvent.click(view.getByRole("button", { name: "Inventario" }));
         const beforeDoubleTap = scrollToTopCalls;

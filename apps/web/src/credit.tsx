@@ -1,3 +1,4 @@
+import { OpeningBalanceDetails } from "./opening-balance.js";
 import Autocomplete from "@mui/material/Autocomplete";
 import TextField from "@mui/material/TextField";
 import React, { useEffect, useState, useRef } from "react";
@@ -15,7 +16,9 @@ function browserPending(owner: string): Pending | null {
   if (
     typeof p.body !== "string" ||
     typeof p.key !== "string" ||
-    !/^\/credit\/(checkout|sales|sales\/[0-9a-f-]+\/payments)$/.test(p.path)
+    !/^\/credit\/(checkout|sales|(?:sales|openings)\/[0-9a-f-]+\/payments)$/.test(
+      p.path,
+    )
   )
     throw Error("Revisa el intento pendiente antes de continuar");
   return p;
@@ -514,6 +517,16 @@ export function Credits({
       {detail && !payment && (
         <Modal title={"Crédito · " + detail.name} close={() => setDetail(null)}>
           <p className="price">Debe: {money(detail.balanceCop)}</p>
+          {detail.opening && (
+            <OpeningBalanceDetails
+              value={detail.opening}
+              disabled={busy || !!attempt}
+              onPayment={() => {
+                setPayment({ ...detail.opening, opening: true });
+                setAmount("");
+              }}
+            />
+          )}
           {detail.orders.map((o: any) => (
             <article className="panel" key={o.id}>
               <h3>
@@ -566,7 +579,10 @@ export function Credits({
             onSubmit={(e) => {
               e.preventDefault();
               void mutate(
-                "/credit/sales/" + payment.id + "/payments",
+                "/credit/" +
+                  (payment.opening ? "openings/" : "sales/") +
+                  payment.id +
+                  "/payments",
                 { amountCop: Number(amount) },
                 () => setPayment(null),
               );
@@ -696,6 +712,7 @@ export function BuyerProfile({
             </strong>
           </p>
           <p className="price">Debes: {money(profile.balanceCop)}</p>
+          {profile.opening && <OpeningBalanceDetails value={profile.opening} />}
           <h2>Compras a crédito y abonos</h2>
           {profile.orders.length ? (
             profile.orders.map((o: any) => orderDetails(o, o))

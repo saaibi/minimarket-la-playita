@@ -1,3 +1,4 @@
+import { openingDebt } from "./opening-credit.js";
 import { enqueuePush } from "./push.js";
 import { randomUUID, createHash } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
@@ -260,7 +261,7 @@ export class Store {
               [creditClient.id],
             )
           ).rows;
-          let debt = 0;
+          let debt = (await openingDebt(db, creditClient.id))?.balance || 0;
           for (const order of debts) {
             const paid = Number(
               (
@@ -478,6 +479,29 @@ export class Store {
             )
           ).rows;
           let remaining = settlement.amountCop;
+          const opening = await openingDebt(db, settlement.clientId);
+          if (opening && remaining > 0 && opening.balance > 0) {
+            const amount = Math.min(remaining, opening.balance);
+            await db.query(
+              "INSERT INTO credit_opening_payments(id,opening_id,amount_cop,actor_id) VALUES($1,$2,$3,$4)",
+              [randomUUID(), opening.id, amount, actor.id],
+            );
+            await this.audit(
+              db,
+              actor,
+              "credit.opening.payment",
+              opening.id,
+              { balanceCop: opening.balance },
+              {
+                amountCop: amount,
+                balanceCop: opening.balance - amount,
+                checkoutOrderId: id,
+              },
+              "Abono a saldo anterior recibido junto con venta en caja",
+            );
+            remaining -= amount;
+          }
+
           for (const debt of debts) {
             const paid = Number(
               (
@@ -562,8 +586,8 @@ export class Store {
     return (
       await this.pool
         .query(`SELECT c.id,COALESCE(c.email,c.phone) AS name,'' AS contact,c.role,c.active,c.credit_enabled AS \"creditEnabled\",
-      COALESCE((SELECT SUM(o.total_cop) FROM credit_sales s JOIN orders o ON o.id=s.order_id WHERE s.client_id=c.id),0)::bigint AS "chargedCop",
-      COALESCE((SELECT SUM(p.amount_cop) FROM credit_payments p JOIN credit_sales s ON s.order_id=p.order_id WHERE s.client_id=c.id),0)::bigint AS "paidCop"
+      (COALESCE((SELECT SUM(o.total_cop) FROM credit_sales s JOIN orders o ON o.id=s.order_id WHERE s.client_id=c.id),0)+COALESCE((SELECT amount_cop FROM credit_openings WHERE client_id=c.id),0))::bigint AS "chargedCop",
+      (COALESCE((SELECT SUM(p.amount_cop) FROM credit_payments p JOIN credit_sales s ON s.order_id=p.order_id WHERE s.client_id=c.id),0)+COALESCE((SELECT SUM(p.amount_cop) FROM credit_opening_payments p JOIN credit_openings o ON o.id=p.opening_id WHERE o.client_id=c.id),0))::bigint AS "paidCop"
       FROM app_users c WHERE NOT c.is_guest ORDER BY c.created_at`)
     ).rows.map((c) => ({
       ...c,
@@ -603,11 +627,94 @@ export class Store {
         balanceCop: order.totalCop - paidCop,
       });
     }
+    const initial = (
+      await this.pool.query(
+        'SELECT id,amount_cop AS "totalCop",reason AS note,created_at AS "createdAt" FROM credit_openings WHERE client_id=$1',
+        [id],
+      )
+    ).rows[0];
+    let opening = null;
+    if (initial) {
+      const payments = (
+        await this.pool.query(
+          'SELECT id,amount_cop AS "amountCop",created_at AS "createdAt" FROM credit_opening_payments WHERE opening_id=$1 ORDER BY created_at,id',
+          [initial.id],
+        )
+      ).rows;
+      const paidCop = payments.reduce((n, p) => n + p.amountCop, 0);
+      opening = {
+        ...initial,
+        paidCop,
+        balanceCop: initial.totalCop - paidCop,
+        payments,
+      };
+    }
     return {
       ...client,
       orders,
-      balanceCop: orders.reduce((n, o) => n + o.balanceCop, 0),
+      opening,
+      balanceCop:
+        orders.reduce((n, o) => n + o.balanceCop, 0) +
+        (opening?.balanceCop || 0),
     };
+  }
+  openingCreditPayment(
+    actor: Actor,
+    key: string,
+    id: string,
+    amountCop: number,
+  ) {
+    return this.once(
+      actor,
+      key,
+      { operation: "opening-credit-payment", id, amountCop },
+      async (db, events) => {
+        if (actor.role === "buyer")
+          throw new Conflict("FORBIDDEN", "Solo personal");
+        const ref = (
+          await db.query("SELECT client_id FROM credit_openings WHERE id=$1", [
+            id,
+          ])
+        ).rows[0];
+        if (!ref)
+          throw new Conflict(
+            "CREDIT_UNAVAILABLE",
+            "Saldo anterior no disponible",
+          );
+        await db.query("SELECT id FROM app_users WHERE id=$1 FOR UPDATE", [
+          ref.client_id,
+        ]);
+        const opening = await openingDebt(db, ref.client_id);
+        if (!opening || amountCop > opening.balance)
+          throw new Conflict(
+            "EXCESS_PAYMENT",
+            "El abono supera el saldo pendiente",
+          );
+        const paymentId = randomUUID();
+        await db.query(
+          "INSERT INTO credit_opening_payments(id,opening_id,amount_cop,actor_id) VALUES($1,$2,$3,$4)",
+          [paymentId, id, amountCop, actor.id],
+        );
+        await this.audit(
+          db,
+          actor,
+          "credit.opening.payment",
+          id,
+          { balanceCop: opening.balance },
+          { amountCop, balanceCop: opening.balance - amountCop },
+          "Abono recibido a saldo anterior",
+        );
+        await this.event(db, events, "credit.updated", null, {
+          clientId: ref.client_id,
+        });
+        return {
+          id: paymentId,
+          openingId: id,
+          amountCop,
+          balanceCop: opening.balance - amountCop,
+        };
+      },
+    );
   }
   creditPayment(actor: Actor, key: string, id: string, amountCop: number) {
     return this.once(

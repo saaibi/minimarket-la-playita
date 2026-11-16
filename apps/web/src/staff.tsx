@@ -1,3 +1,9 @@
+import {
+  accountSaveError,
+  OpeningBalanceFields,
+  openingPayload,
+  type OpeningInfo,
+} from "./opening-balance.js";
 import { LoadingMark } from "./ui.js";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -12,6 +18,7 @@ type Staff = {
   role: string;
   active: boolean;
   creditEnabled: boolean;
+  openingBalance?: OpeningInfo | null;
 };
 export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
   const session = useSession()!,
@@ -19,6 +26,10 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
     [email, setEmail] = useState(""),
     [role, setRole] = useState("seller"),
     [creditEnabled, setCreditEnabled] = useState(false),
+    [openingAmount, setOpeningAmount] = useState(""),
+    [openingNote, setOpeningNote] = useState(
+      "Deuda previa al uso de la aplicación",
+    ),
     [message, setMessage] = useState(""),
     [loading, setLoading] = useState(true);
   async function load() {
@@ -36,6 +47,9 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
       setMessage("No fue posible consultar el personal."),
     );
   }, []);
+  const existingOpening = users.find(
+    (u) => u.email.toLowerCase() === email.trim().toLowerCase(),
+  )?.openingBalance;
   return (
     <section className="staff-users">
       {!embedded && <Link to="/app">← Volver a tienda</Link>}
@@ -52,19 +66,32 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
               try {
                 const r = await auth.request("/auth/users/assign-role", {
                   method: "POST",
-                  body: JSON.stringify({ email, role, creditEnabled }),
+                  body: JSON.stringify({
+                    email,
+                    role,
+                    creditEnabled,
+                    ...openingPayload(
+                      creditEnabled,
+                      existingOpening,
+                      openingAmount,
+                      openingNote,
+                    ),
+                  }),
                 });
-                if (!r.ok) throw Error();
+                if (!r.ok) throw Error((await r.json()).code || "");
                 setEmail("");
+                setOpeningAmount("");
+                setOpeningNote("Deuda previa al uso de la aplicación");
+                window.dispatchEvent(
+                  new window.Event("playita:accounts-changed"),
+                );
                 setCreditEnabled(false);
                 setMessage(
                   "Cuenta guardada. El rol y el permiso de crédito están actualizados.",
                 );
                 await load();
-              } catch {
-                setMessage(
-                  "No fue posible guardar el rol. Revisa el correo y los permisos.",
-                );
+              } catch (e: any) {
+                setMessage(accountSaveError(String(e.message)));
               }
             })();
           }}
@@ -95,6 +122,14 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
             />
             Permitir compras a crédito
           </label>
+          <OpeningBalanceFields
+            enabled={creditEnabled}
+            existing={existingOpening}
+            amount={openingAmount}
+            note={openingNote}
+            onAmount={setOpeningAmount}
+            onNote={setOpeningNote}
+          />
           <Button>Guardar cuenta</Button>
         </form>
       </section>
@@ -127,6 +162,8 @@ export function StaffUsers({ embedded = false }: { embedded?: boolean }) {
                     tone="secondary"
                     type="button"
                     onClick={() => {
+                      setOpeningAmount("");
+                      setOpeningNote("Deuda previa al uso de la aplicación");
                       setEmail(u.email);
                       setRole(u.role);
                       setCreditEnabled(!!u.creditEnabled);

@@ -1,3 +1,9 @@
+import {
+  accountSaveError,
+  OpeningBalanceFields,
+  openingPayload,
+  type OpeningInfo,
+} from "./opening-balance.js";
 import { InventoryActions } from "./inventory-actions.js";
 import { ReplenishmentOrder } from "./replenishment-order.js";
 import { supplierName } from "./replenishment.js";
@@ -1011,9 +1017,6 @@ export function Settings({
   );
 }
 function Clients({ api }: { api: Api }) {
-  const [contacts, setContacts] = useState<
-    { id: string; name: string; contact: string }[]
-  >([]);
   const [accounts, setAccounts] = useState<
     {
       id: string;
@@ -1021,33 +1024,41 @@ function Clients({ api }: { api: Api }) {
       phone: string | null;
       active: boolean;
       creditEnabled: boolean;
+      openingBalance?: OpeningInfo | null;
     }[]
   >([]);
   const [message, setMessage] = useState("Consultando clientes…");
   useEffect(() => {
     let active = true;
-    void Promise.all([api("/clients"), api("/auth/customers")])
-      .then(([list, users]) => {
-        if (active) {
-          setContacts(list);
-          setAccounts(users);
-          setMessage("");
-        }
-      })
-      .catch(() => {
-        if (active) setMessage("No se pudieron consultar los clientes.");
-      });
+    const load = () =>
+      void api("/auth/customers")
+        .then((users) => {
+          if (active) {
+            setAccounts(users);
+            setMessage("");
+          }
+        })
+        .catch(() => {
+          if (active) setMessage("No se pudieron consultar los clientes.");
+        });
+    load();
+    window.addEventListener("playita:accounts-changed", load);
     return () => {
       active = false;
+      window.removeEventListener("playita:accounts-changed", load);
     };
   }, []);
   const [editing, setEditing] = useState<any>(null),
     [saving, setSaving] = useState(false),
-    [editError, setEditError] = useState("");
+    [editError, setEditError] = useState(""),
+    [openingAmount, setOpeningAmount] = useState(""),
+    [openingNote, setOpeningNote] = useState(
+      "Deuda previa al uso de la aplicación",
+    );
   return (
     <section className="panel staff-users">
       <h2>Clientes</h2>
-      <p>Consulta de clientes registrados y contactos de la tienda.</p>
+      <p>Clientes con cuenta registrada.</p>
       {message === "Consultando clientes…" ? (
         <LoadingMark label={message} />
       ) : (
@@ -1077,6 +1088,8 @@ function Clients({ api }: { api: Api }) {
                 type="button"
                 onClick={() => (
                   setEditError(""),
+                  setOpeningAmount(""),
+                  setOpeningNote("Deuda previa al uso de la aplicación"),
                   setEditing({ ...c, creditEnabled: !!c.creditEnabled })
                 )}
               >
@@ -1105,9 +1118,15 @@ function Clients({ api }: { api: Api }) {
                 body: JSON.stringify({
                   creditEnabled: editing.creditEnabled,
                   email: editing.email,
+                  ...openingPayload(
+                    editing.creditEnabled,
+                    editing.openingBalance,
+                    openingAmount,
+                    openingNote,
+                  ),
                 }),
               })
-                .then(() => {
+                .then(async () => {
                   setAccounts((list) =>
                     list.map((c) =>
                       c.id === editing.id
@@ -1119,13 +1138,10 @@ function Clients({ api }: { api: Api }) {
                         : c,
                     ),
                   );
+                  setAccounts(await api("/auth/customers"));
                   setEditing(null);
                 })
-                .catch(() =>
-                  setEditError(
-                    "No se pudo guardar el cliente. Verifica que el correo no esté en uso.",
-                  ),
-                )
+                .catch((e) => setEditError(accountSaveError(String(e.message))))
                 .finally(() => setSaving(false));
             }}
           >
@@ -1156,6 +1172,14 @@ function Clients({ api }: { api: Api }) {
               Deshabilitarlo impide nuevos créditos y conserva la deuda y los
               abonos anteriores.
             </p>
+            <OpeningBalanceFields
+              enabled={editing.creditEnabled}
+              existing={editing.openingBalance}
+              amount={openingAmount}
+              note={openingNote}
+              onAmount={setOpeningAmount}
+              onNote={setOpeningNote}
+            />
             {editError && <p role="alert">{editError}</p>}
             <Button type="submit" disabled={saving}>
               Guardar cliente
@@ -1163,18 +1187,6 @@ function Clients({ api }: { api: Api }) {
           </form>
         </Modal>
       )}
-      <h3>Contactos guardados</h3>
-      {!message && !contacts.length && <p>No hay contactos guardados.</p>}
-      <ul className="customer-list">
-        {[...contacts]
-          .sort((a, b) => a.name.localeCompare(b.name, "es"))
-          .map((c) => (
-            <li key={c.id}>
-              <strong>{c.name}</strong>
-              {c.contact && <small>{c.contact}</small>}
-            </li>
-          ))}
-      </ul>
     </section>
   );
 }

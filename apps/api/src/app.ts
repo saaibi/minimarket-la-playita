@@ -54,7 +54,7 @@ class ApiController {
     try {
       const healthQuery = {
         text: "SELECT version FROM schema_migrations WHERE version = $1",
-        values: ["011_product_weight_unit.sql"],
+        values: ["012_opening_credit.sql"],
         query_timeout: 2500,
       };
       const result = await this.store.pool.query(healthQuery);
@@ -448,6 +448,30 @@ class ApiController {
     if (!parsed.success || !id.success || !z.uuid().safeParse(orderId).success)
       return res.status(400).json({ code: "VALIDATION_ERROR" });
     const r = await this.store.creditPayment(
+      req.actor,
+      id.data,
+      orderId,
+      parsed.data.amountCop,
+    );
+    res.setHeader("Idempotency-Replayed", String(!!r.replayed));
+    return res.status(r.status).json(r.body);
+  }
+  @Post("credit/openings/:id/payments") async openingCreditPayment(
+    @Req() req: Request,
+    @Param("id") orderId: string,
+    @Body() body: unknown,
+    @Res() res: any,
+  ) {
+    if (req.actor.role === "buyer")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    const parsed = z
+        .object({ amountCop: z.number().int().positive().max(2000000000) })
+        .strict()
+        .safeParse(body),
+      id = key(req);
+    if (!parsed.success || !id.success || !z.uuid().safeParse(orderId).success)
+      return res.status(400).json({ code: "VALIDATION_ERROR" });
+    const r = await this.store.openingCreditPayment(
       req.actor,
       id.data,
       orderId,

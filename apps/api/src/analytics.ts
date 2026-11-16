@@ -33,7 +33,7 @@ export async function businessReport(pool: Pool, from: string, to: string) {
  'from',$1::text,'to',$2::text,'timezone','America/Bogota',
  'salesCop',COALESCE((SELECT SUM(total_cop) FROM sales),0),'saleCount',(SELECT COUNT(*) FROM sales),
  'cashCop',COALESCE((SELECT SUM(cash) FROM daily),0),'creditCop',COALESCE((SELECT SUM(credit) FROM daily),0),
- 'paymentsCop',(SELECT total FROM payments),'balanceCop',(SELECT balance FROM debt),
+ 'paymentsCop',(SELECT total FROM payments)+COALESCE((SELECT SUM(p.amount_cop) FROM credit_opening_payments p,bounds b WHERE p.created_at>=b.start_at AND p.created_at<b.end_at),0),'balanceCop',(SELECT balance FROM debt)+COALESCE((SELECT SUM(o.amount_cop-COALESCE((SELECT SUM(p.amount_cop) FROM credit_opening_payments p WHERE p.opening_id=o.id),0)) FROM credit_openings o),0),
  'daily',(SELECT COALESCE(jsonb_agg(jsonb_build_object('day',d.report_day,'totalCop',COALESCE(s.total,0),'cashCop',COALESCE(s.cash,0),'creditCop',COALESCE(s.credit,0)) ORDER BY d.report_day),'[]'::jsonb) FROM (SELECT generate_series($1::date,$2::date,'1 day')::date AS report_day) d LEFT JOIN daily s USING(report_day)),
  'topProducts',(SELECT COALESCE(jsonb_agg(jsonb_build_object('name',name,'totalCop',total) ORDER BY total DESC),'[]'::jsonb) FROM tops),
  'inventory',jsonb_build_object('available',(SELECT COUNT(*) FROM products WHERE stock-reserved>minimum),'low',(SELECT COUNT(*) FROM products WHERE stock-reserved>0 AND stock-reserved<=minimum),'out',(SELECT COUNT(*) FROM products WHERE stock-reserved=0))
