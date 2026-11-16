@@ -40,7 +40,7 @@ test("Pedido a proveedor: filtro, validación, compartir y cancelar sin modifica
       stock: 0,
       reserved: 0,
       priceCop: 650,
-      presentations: [],
+      presentations: [{ id: "pack", name: "Caja", factor: 12, priceCop: 6500 }],
     },
     {
       id: "two",
@@ -127,6 +127,34 @@ test("Pedido a proveedor: filtro, validación, compartir y cancelar sin modifica
     fireEvent.click(share);
     await waitFor(() => assert.match(sent.text, /Suficiente: 1 × caja de 12/));
     assert.equal(sent.text.includes("Huevos"), false);
+    fireEvent.change(view.getByLabelText("Presentación de pedido de Huevos"), {
+      target: { value: "presentation:pack" },
+    });
+    assert.equal(
+      (view.getByLabelText("Cantidad a pedir de Huevos") as HTMLInputElement)
+        .value,
+      "0",
+    );
+    fireEvent.change(view.getByLabelText("Cantidad a pedir de Huevos"), {
+      target: { value: "3" },
+    });
+    fireEvent.click(share);
+    await waitFor(() =>
+      assert.match(sent.text, /Huevos: 3 × Caja \(12 unidades\)/),
+    );
+    fireEvent.change(view.getByLabelText("Presentación de pedido de Huevos"), {
+      target: { value: "unit" },
+    });
+    assert.equal(
+      (view.getByLabelText("Cantidad a pedir de Huevos") as HTMLInputElement)
+        .value,
+      "0",
+    );
+    fireEvent.change(view.getByLabelText("Cantidad a pedir de Huevos"), {
+      target: { value: "5" },
+    });
+    fireEvent.click(share);
+    await waitFor(() => assert.match(sent.text, /Huevos: 5 unidades/));
     assert.equal(JSON.stringify(products), before);
   } finally {
     cleanup();

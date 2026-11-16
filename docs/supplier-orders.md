@@ -17,3 +17,7 @@ También se actualizaron los selectores de estilos de botones a las clases de Ma
 La migración `013_purchase_presentation.sql` añade una etiqueta opcional de presentación de compra, independiente de las unidades de venta. Se configura una vez al crear o editar un producto, por ejemplo «arroba» o «tira de 24 unidades». No supone conversiones ni modifica precios o existencias. Las versiones antiguas que no envían este campo conservan el valor guardado.
 
 El pedido se prepara para un proveedor. Sus productos por reponer aparecen con cantidad cero y controles grandes de menos/más, además de entrada manual. Cero omite el producto; las presentaciones de compra usan cantidades enteras. Sin presentación configurada se conserva la medida previa de unidades, kilos o libras. «Añadir otro producto» permite buscar productos existentes del mismo proveedor aunque no estén por reponer. Solo las cantidades positivas aparecen en el texto compartido, sin existencias actuales.
+
+## Selección entre presentaciones existentes
+
+Cada producto permite elegir al preparar el pedido entre su presentación de compra guardada, las presentaciones registradas de venta (indicando su cantidad de unidades) y la unidad individual. Los productos por peso permiten elegir kilo o libra, además de la presentación de compra. La elección solo cambia el texto del pedido: no cambia existencias ni precios. Cambiar de presentación reinicia la cantidad a cero para evitar pedir accidentalmente el mismo número de cajas que se había escrito en unidades.

@@ -8,6 +8,8 @@ import {
   needsReplenishment,
   supplierName,
   orderUnit,
+  purchaseOptions,
+  purchaseOption,
   validOrderQuantity,
   replenishmentText,
 } from "./replenishment.js";
@@ -31,6 +33,7 @@ export function ReplenishmentOrder({
           : "",
     ),
     [draft, setDraft] = useState<Record<string, string>>({}),
+    [choices, setChoices] = useState<Record<string, string>>({}),
     [added, setAdded] = useState<string[]>([]),
     [adding, setAdding] = useState(false),
     [search, setSearch] = useState(""),
@@ -43,7 +46,11 @@ export function ReplenishmentOrder({
   const selected = listed.filter((p) => Number(draft[p.id] || 0) > 0);
   const invalid = listed.some((p) => {
     const q = draft[p.id] || "";
-    return q.trim() !== "" && Number(q) !== 0 && !validOrderQuantity(p, q);
+    return (
+      q.trim() !== "" &&
+      Number(q) !== 0 &&
+      !validOrderQuantity(p, q, choices[p.id])
+    );
   });
   const ready = selected.length > 0 && !invalid;
   const text = ready
@@ -51,6 +58,7 @@ export function ReplenishmentOrder({
         selected.map((product) => ({
           product,
           quantity: draft[product.id] || "",
+          presentation: choices[product.id],
         })),
       )
     : "";
@@ -159,9 +167,23 @@ export function ReplenishmentOrder({
               <li key={p.id}>
                 <div>
                   <strong>{p.name}</strong>
-                  <small>
-                    Presentación: <strong>{orderUnit(p)}</strong>
-                  </small>
+                  <label>
+                    Presentación
+                    <Select
+                      aria-label={`Presentación de pedido de ${p.name}`}
+                      value={choices[p.id] || purchaseOptions(p)[0]!.id}
+                      onChange={(e) => {
+                        setChoices((c) => ({ ...c, [p.id]: e.target.value }));
+                        update(p.id, "0");
+                      }}
+                    >
+                      {purchaseOptions(p).map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </label>
                   <small>Quedan: {stockLabel(p, p.available)}</small>
                 </div>
                 <div className="order-quantity">
@@ -177,19 +199,13 @@ export function ReplenishmentOrder({
                   <Input
                     type="number"
                     inputMode={
-                      p.purchasePresentation?.trim() || p.kind === "unit"
+                      (purchaseOption(p, choices[p.id])?.step ?? 1) === 1
                         ? "numeric"
                         : "decimal"
                     }
                     min="0"
                     max="100000000"
-                    step={
-                      p.purchasePresentation?.trim() || p.kind === "unit"
-                        ? 1
-                        : p.weightUnit === "lb"
-                          ? 0.002
-                          : 0.001
-                    }
+                    step={purchaseOption(p, choices[p.id])?.step ?? 1}
                     value={draft[p.id] ?? "0"}
                     aria-label={`Cantidad a pedir de ${p.name}`}
                     onFocus={(e) => e.target.select()}
