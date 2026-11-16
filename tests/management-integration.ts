@@ -293,6 +293,13 @@ test(
       const reportReply = await req(reportPath, admin);
       assert.equal(reportReply.status, 200);
       const reportBeforeRemoval = reportReply.data;
+      assert.equal((await req("/sales?page=1", buyer)).status, 403);
+      assert.equal((await req("/sales?page=0", seller)).status, 400);
+      const salesFirst = await req("/sales?page=1", seller);
+      assert.equal(salesFirst.status, 200);
+      assert.equal(salesFirst.data.total, 1);
+      assert.equal(salesFirst.data.items[0].id, sale.data.id);
+
       assert.equal(
         reportBeforeRemoval.salesCop,
         reportBeforeRemoval.cashCop + reportBeforeRemoval.creditCop,
@@ -1088,6 +1095,30 @@ test(
           )
         ).rows[0].n,
         1,
+      );
+      const salesBeforePaging = (await req("/sales?page=1", admin)).data;
+      await server.pool.query(
+        "INSERT INTO orders(id,owner_id,status,payment_method,payment_status,total_cop) SELECT gen_random_uuid(),$1,'delivered','cash','paid',0 FROM generate_series(1,105)",
+        [creditCustomer.id],
+      );
+      const pageOne = (await req("/sales?page=1", seller)).data;
+      const pageTwo = (await req("/sales?page=2", seller)).data;
+      assert.equal(pageOne.total, salesBeforePaging.total + 105);
+      assert.equal(pageOne.totalCop, salesBeforePaging.totalCop);
+      assert.equal(pageOne.items.length, 20);
+      assert.equal(pageTwo.items.length, 20);
+      assert.equal(
+        new Set([...pageOne.items, ...pageTwo.items].map((o: any) => o.id))
+          .size,
+        40,
+      );
+      const lastPage = Math.ceil(pageOne.total / pageOne.pageSize);
+      assert.ok(
+        (await req("/sales?page=" + lastPage, seller)).data.items.length > 0,
+      );
+      assert.equal(
+        (await req("/sales?page=" + (lastPage + 1), seller)).data.items.length,
+        0,
       );
     } finally {
       await server?.close();

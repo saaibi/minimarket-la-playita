@@ -494,6 +494,22 @@ class ApiController {
         this.store.removeSale(req.actor, key, id, value.removed, value.reason),
     );
   }
+  @Get("sales") async sales(
+    @Req() req: Request,
+    @Query("page") page: string,
+    @Res() res: any,
+  ) {
+    if (req.actor.role === "buyer")
+      return res.status(403).json({ code: "FORBIDDEN" });
+    const parsed = z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100000)
+      .safeParse(page ?? 1);
+    if (!parsed.success) return res.status(400).json({ code: "INVALID_PAGE" });
+    return res.json(await this.store.salesPage(req.actor, parsed.data));
+  }
   @Get("orders") orders(@Req() req: Request) {
     return this.store.list(req.actor);
   }

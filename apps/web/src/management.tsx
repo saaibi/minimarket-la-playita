@@ -1,4 +1,3 @@
-import { BusinessDashboard } from "./business-dashboard.js";
 import { LoadingMark } from "./ui.js";
 import { TextSizeSettings } from "./material.js";
 import { Button, Input, Select, Textarea } from "./material.js";
@@ -167,7 +166,7 @@ export function Inventory({
         </Select>
       </div>
       <div className="table-wrap">
-        <table>
+        <table className="inventory-table">
           <thead>
             <tr>
               <th>Imagen</th>
@@ -175,7 +174,7 @@ export function Inventory({
               <th>Físico</th>
               <th>Reservado</th>
               <th>Disponible</th>
-              <th>Precio de venta</th>
+              <th>Precio</th>
               {admin && (
                 <>
                   <th>Costo</th>
@@ -204,26 +203,25 @@ export function Inventory({
                     </span>
                   )}
                 </td>
-                <td>
+                <td className="inventory-product-info">
                   <strong>{p.name}</strong>
                   <small>
                     {p.category || "Despensa"} · {p.code}
                   </small>
-                  <small>
-                    {p.kind === "weight"
-                      ? p.weightUnit === "lb"
-                        ? "Por libra"
-                        : "Por kilo"
-                      : "Unidades"}{" "}
-                    · {p.visible === false ? "Oculto" : "Visible"}
-                  </small>
-                  <small>
-                    {p.presentations
-                      .map(
-                        (v) => `${v.name} (${v.factor}) ${money(v.priceCop)}`,
-                      )
-                      .join(" · ")}
-                  </small>
+                  {p.presentations.length > 0 && (
+                    <details className="inventory-presentations">
+                      <summary>
+                        {p.presentations.length === 1
+                          ? "Presentación"
+                          : `${p.presentations.length} presentaciones`}
+                      </summary>
+                      {p.presentations.map((v) => (
+                        <small key={v.id || v.name}>
+                          {v.name} ({v.factor}) · {money(v.priceCop)}
+                        </small>
+                      ))}
+                    </details>
+                  )}
                 </td>
                 <td>{stockLabel(p, p.stock)}</td>
                 <td>{stockLabel(p, p.reserved)}</td>
@@ -297,12 +295,6 @@ export function Inventory({
         <p className="empty">No hay productos para este filtro.</p>
       )}
       <p role="alert">{error}</p>
-      {admin && (
-        <BusinessDashboard
-          api={api}
-          refreshKey={`${refreshToken}-${ordersCount}-${salesTotal}-${products.map((p) => p.version).join(",")}`}
-        />
-      )}
       {edit !== undefined && (
         <ProductEditor
           product={edit}

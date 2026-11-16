@@ -1,3 +1,4 @@
+import { SalesHistory } from "./sales-history.js";
 import {
   useNativePush,
   NativePushControl,
@@ -37,7 +38,7 @@ import {
   modulesFor,
 } from "./ui.js";
 import { Inventory, Settings } from "./management.js";
-type Order = {
+export type Order = {
   id: string;
   status: string;
   paymentStatus: string;
@@ -148,6 +149,7 @@ export function Shop() {
       window.removeEventListener("focus", refreshCredit);
     };
   }, [session.actor.id, session.mode, staff]);
+  const menuTap = useRef({ id: "", time: 0 });
   const cartSnapshot = useRef(cart);
   cartSnapshot.current = cart;
   useEffect(() => {
@@ -803,6 +805,13 @@ export function Shop() {
                 className={view === id ? "active" : ""}
                 disabled={pendingSale && id !== "pos"}
                 onClick={() => {
+                  const now = performance.now();
+                  if (
+                    menuTap.current.id === id &&
+                    now - menuTap.current.time < 400
+                  )
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  menuTap.current = { id, time: now };
                   setView(id);
                   if (id === "notifications") setNoticeTab("orders");
                 }}
@@ -1022,18 +1031,20 @@ export function Shop() {
               }}
             />
           )}
-          {(view === "orders" || view === "history") && (
+          {view === "history" && (
+            <SalesHistory
+              api={request}
+              admin={admin}
+              refreshKey={`${refreshToken}-${orders.map((o) => o.id + o.status + o.paymentStatus).join(",")}`}
+              onDetail={setSelected}
+            />
+          )}
+          {view === "orders" && (
             <>
               <div className="heading">
                 <div>
                   <p className="eyebrow">TODO EN UN SOLO LUGAR</p>
-                  <h1>
-                    {view === "history"
-                      ? "Ventas registradas"
-                      : staff
-                        ? "Pedidos"
-                        : "Mis pedidos"}
-                  </h1>
+                  <h1>{staff ? "Pedidos" : "Mis pedidos"}</h1>
                   <p>
                     Últimos 100 pedidos consultados. Pagos y entregas se
                     registran por separado.
@@ -1050,32 +1061,11 @@ export function Shop() {
                   </Select>
                 )}
               </div>
-              {view === "history" && (
-                <div className="stats">
-                  <div className="stat">
-                    Ventas cargadas<b>{filteredOrders.length}</b>
-                  </div>
-                  <div className="stat">
-                    Total de ventas cargadas
-                    <b>
-                      {money(
-                        filteredOrders.reduce((n, o) => n + o.totalCop, 0),
-                      )}
-                    </b>
-                  </div>
-                </div>
-              )}
               <div className="cards orders">
                 {filteredOrders.map((o) => orderCard(o))}
               </div>
               {!filteredOrders.length && (
-                <p className="empty">
-                  No hay{" "}
-                  {view === "history"
-                    ? "ventas registradas"
-                    : "pedidos para este filtro"}
-                  .
-                </p>
+                <p className="empty">No hay {"pedidos para este filtro"}.</p>
               )}
               {native &&
                 rows.some((r) => r.status !== "synced" && !r.resolved_by) && (

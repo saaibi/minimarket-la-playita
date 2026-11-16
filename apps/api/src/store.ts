@@ -45,6 +45,28 @@ export class Store {
       ).rows;
     return rows;
   }
+  async salesPage(actor: Actor, page: number) {
+    const pageSize = 20;
+    const { rows } = await this.pool.query(
+      `WITH sales AS (
+      SELECT o.id,o.created_at,o.total_cop FROM orders o WHERE NOT o.sale_removed AND o.status='delivered'
+      AND (o.payment_status='paid' OR EXISTS(SELECT 1 FROM credit_sales c WHERE c.order_id=o.id))
+    ), paged AS (SELECT id,created_at FROM sales ORDER BY created_at DESC,id DESC LIMIT $1 OFFSET $2)
+    SELECT (SELECT count(*)::int FROM sales) total, (SELECT COALESCE(sum(total_cop),0)::text FROM sales) amount,
+    (SELECT COALESCE(jsonb_agg(id ORDER BY created_at DESC,id DESC),'[]'::jsonb) FROM paged) ids`,
+      [pageSize, (page - 1) * pageSize],
+    );
+    const result = rows[0];
+    return {
+      page,
+      pageSize,
+      total: result.total,
+      totalCop: Number(result.amount),
+      items: await Promise.all(
+        result.ids.map((id: string) => this.get(actor, id)),
+      ),
+    };
+  }
   async list(actor: Actor) {
     const { rows } = await this.pool.query(
       `SELECT id FROM orders WHERE NOT sale_removed ${actor.role === "buyer" ? "AND (owner_id=$1 OR customer_id=$2)" : ""} ORDER BY created_at DESC LIMIT 100`,
