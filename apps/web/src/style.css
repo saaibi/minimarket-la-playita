@@ -2153,3 +2153,37 @@ label .MuiInputBase-root {
   display: block;
   margin: 4px 0;
 }
+.simple-order-list li {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.order-quantity {
+  display: grid;
+  grid-template-columns: 48px minmax(70px, 100px) 48px;
+  align-items: center;
+  gap: 10px;
+}
+.order-quantity .MuiButton-root {
+  min-width: 48px;
+  min-height: 48px;
+  font-size: 1.3rem;
+  margin: 0;
+}
+.order-quantity input {
+  text-align: center;
+  font-size: 1.1rem;
+}
+.other-supplier-products {
+  margin: 12px 0;
+}
+.other-supplier-products ul {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.other-supplier-products li .MuiButton-root {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}

@@ -4,6 +4,7 @@ export const supplierName = (p: Product) =>
 export const needsReplenishment = (p: Product) =>
   p.available <= (p.minimum || 0);
 export function orderUnit(p: Product) {
+  if (p.purchasePresentation?.trim()) return p.purchasePresentation.trim();
   return p.kind === "weight"
     ? p.weightUnit === "lb"
       ? "libras"
@@ -13,7 +14,12 @@ export function orderUnit(p: Product) {
 export function validOrderQuantity(p: Product, value: string) {
   if (!value.trim()) return false;
   const n = Number(value);
-  const factor = p.kind === "unit" ? 1 : p.weightUnit === "lb" ? 500 : 1000;
+  const factor =
+    p.purchasePresentation?.trim() || p.kind === "unit"
+      ? 1
+      : p.weightUnit === "lb"
+        ? 500
+        : 1000;
   return (
     Number.isFinite(n) &&
     n > 0 &&
@@ -41,7 +47,7 @@ export function replenishmentText(
     parts.push("", `Proveedor: ${supplier}`);
     for (const { product: p, quantity } of items)
       parts.push(
-        `• ${p.name}${p.code ? ` [${p.code}]` : ""}: ${Number(quantity).toLocaleString("es-CO", { maximumFractionDigits: 3 })} ${orderUnit(p)}`,
+        `• ${p.name}${p.code ? ` [${p.code}]` : ""}: ${Number(quantity).toLocaleString("es-CO", { maximumFractionDigits: 3 })} ${p.purchasePresentation?.trim() ? "× " : ""}${orderUnit(p)}`,
       );
   }
   return parts.join("\n");

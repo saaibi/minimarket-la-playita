@@ -58,6 +58,7 @@ test("Pedido a proveedor: filtro, validación, compartir y cancelar sin modifica
     {
       id: "three",
       name: "Suficiente",
+      purchasePresentation: "caja de 12",
       kind: "unit",
       supplier: "Proveedor A",
       available: 10,
@@ -93,6 +94,39 @@ test("Pedido a proveedor: filtro, validación, compartir y cancelar sin modifica
     cancel = true;
     fireEvent.click(share);
     await waitFor(() => assert.ok(view.getByText(/No se compartió el pedido/)));
+    cancel = false;
+    fireEvent.change(view.getByLabelText("Cantidad a pedir de Huevos"), {
+      target: { value: "0" },
+    });
+    assert.equal(share.disabled, true);
+    fireEvent.click(view.getByRole("button", { name: "Añadir otro producto" }));
+    assert.equal(view.queryByRole("button", { name: /Papa/ }), null);
+    fireEvent.click(
+      view.getByRole("button", { name: /Suficiente · caja de 12/ }),
+    );
+    assert.equal(
+      (
+        view.getByLabelText(
+          "Cantidad a pedir de Suficiente",
+        ) as HTMLInputElement
+      ).value,
+      "1",
+    );
+    fireEvent.click(view.getByRole("button", { name: "Pedir más Suficiente" }));
+    assert.equal(
+      (
+        view.getByLabelText(
+          "Cantidad a pedir de Suficiente",
+        ) as HTMLInputElement
+      ).value,
+      "2",
+    );
+    fireEvent.click(
+      view.getByRole("button", { name: "Pedir menos Suficiente" }),
+    );
+    fireEvent.click(share);
+    await waitFor(() => assert.match(sent.text, /Suficiente: 1 × caja de 12/));
+    assert.equal(sent.text.includes("Huevos"), false);
     assert.equal(JSON.stringify(products), before);
   } finally {
     cleanup();

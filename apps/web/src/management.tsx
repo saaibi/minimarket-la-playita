@@ -527,6 +527,7 @@ function ProductEditor({
       category: product?.category || "Despensa",
       code: product?.code || "",
       supplier: product?.supplier || "",
+      purchasePresentation: product?.purchasePresentation || "",
       description: product?.description || "",
       photo: product?.photo || "",
       kind: product?.kind || "unit",
@@ -613,6 +614,21 @@ function ProductEditor({
             />
           </label>
         </div>
+        <label>
+          Presentación para pedir al proveedor
+          <Input
+            maxLength={80}
+            spellCheck
+            lang="es"
+            value={value.purchasePresentation || ""}
+            placeholder="Ej.: arroba, tira de 24 unidades, caja de 12"
+            onChange={(e) => field("purchasePresentation", e.target.value)}
+          />
+          <small>
+            Opcional. Se usa solo en el pedido al proveedor; no cambia
+            existencias ni precios de venta.
+          </small>
+        </label>
         <label>
           Tipo
           <Select

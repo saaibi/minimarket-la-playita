@@ -6,6 +6,7 @@ export const productWriteSchema = z
     category: z.string().trim().min(1).max(80).default("Despensa"),
     code: z.string().trim().max(80).default(""),
     supplier: z.string().trim().max(150).default(""),
+    purchasePresentation: z.string().trim().max(80).optional(),
     description: z.string().trim().max(1000).default(""),
     photo: z
       .union([
