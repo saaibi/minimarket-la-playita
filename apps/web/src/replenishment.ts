@@ -12,14 +12,18 @@ export type PurchaseOption = {
 };
 export function purchaseOptions(p: Product): PurchaseOption[] {
   const options: PurchaseOption[] = [];
-  if (p.purchasePresentation?.trim())
-    options.push({
-      id: "purchase",
-      label: p.purchasePresentation.trim(),
-      unit: p.purchasePresentation.trim(),
-      step: 1,
-      package: true,
-    });
+  const labels =
+    p.purchasePresentations ??
+    (p.purchasePresentation?.trim() ? [p.purchasePresentation.trim()] : []);
+  for (const [index, label] of labels.entries())
+    if (label.trim())
+      options.push({
+        id: index === 0 ? "purchase" : "purchase:" + label,
+        label: label.trim(),
+        unit: label.trim(),
+        step: 1,
+        package: true,
+      });
   if (p.kind === "unit") {
     options.push({
       id: "unit",

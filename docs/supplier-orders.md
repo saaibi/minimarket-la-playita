@@ -21,3 +21,7 @@ El pedido se prepara para un proveedor. Sus productos por reponer aparecen con c
 ## Selección entre presentaciones existentes
 
 Cada producto permite elegir al preparar el pedido entre su presentación de compra guardada, las presentaciones registradas de venta (indicando su cantidad de unidades) y la unidad individual. Los productos por peso permiten elegir kilo o libra, además de la presentación de compra. La elección solo cambia el texto del pedido: no cambia existencias ni precios. Cambiar de presentación reinicia la cantidad a cero para evitar pedir accidentalmente el mismo número de cajas que se había escrito en unidades.
+
+## Varias presentaciones exclusivas de compra
+
+La migración `014_purchase_presentations.sql` guarda una lista de hasta 20 nombres independientes de las presentaciones de venta y conserva la presentación de compra existente. El editor muestra la lista al final del formulario, antes de Guardar, con Agregar y Quitar. No permite nombres vacíos ni repetidos. El pedido incluye todas las opciones guardadas, además de unidad individual y presentaciones de venta. Una APK antigua que cambie la presentación única conserva las demás opciones de compra guardadas. No cambia SQLite, existencias ni precios.

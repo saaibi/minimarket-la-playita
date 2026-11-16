@@ -2187,3 +2187,24 @@ label .MuiInputBase-root {
   justify-content: flex-start;
   text-align: left;
 }
+.purchase-presentation-fields {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  min-width: 0;
+  margin: 18px 0 12px;
+}
+.purchase-presentation-fields p,
+.purchase-presentation-fields small {
+  font-size: 0.8rem;
+}
+.purchase-presentation-fields small {
+  display: block;
+  margin-top: 8px;
+}
+.purchase-presentation-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}

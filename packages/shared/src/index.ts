@@ -60,6 +60,7 @@ export type Product = {
   code?: string;
   supplier?: string;
   purchasePresentation?: string;
+  purchasePresentations?: string[];
   description?: string;
   photo?: string;
   minimum?: number;

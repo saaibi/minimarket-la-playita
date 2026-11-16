@@ -1,4 +1,8 @@
 import {
+  PurchasePresentationFields,
+  purchaseNamesValid,
+} from "./purchase-presentation-fields.js";
+import {
   accountSaveError,
   OpeningBalanceFields,
   openingPayload,
@@ -527,7 +531,9 @@ function ProductEditor({
       category: product?.category || "Despensa",
       code: product?.code || "",
       supplier: product?.supplier || "",
-      purchasePresentation: product?.purchasePresentation || "",
+      purchasePresentations:
+        product?.purchasePresentations ??
+        (product?.purchasePresentation ? [product.purchasePresentation] : []),
       description: product?.description || "",
       photo: product?.photo || "",
       kind: product?.kind || "unit",
@@ -566,6 +572,12 @@ function ProductEditor({
         onSubmit={(e) => {
           e.preventDefault();
           if (busy || photoBusy) return;
+          if (!purchaseNamesValid(value.purchasePresentations || [])) {
+            setError(
+              "Completa las presentaciones de compra y evita nombres repetidos.",
+            );
+            return;
+          }
           setBusy(true);
           save(value)
             .catch((e) => setError(String(e)))
@@ -614,21 +626,6 @@ function ProductEditor({
             />
           </label>
         </div>
-        <label>
-          Presentación para pedir al proveedor
-          <Input
-            maxLength={80}
-            spellCheck
-            lang="es"
-            value={value.purchasePresentation || ""}
-            placeholder="Ej.: arroba, tira de 24 unidades, caja de 12"
-            onChange={(e) => field("purchasePresentation", e.target.value)}
-          />
-          <small>
-            Opcional. Se usa solo en el pedido al proveedor; no cambia
-            existencias ni precios de venta.
-          </small>
-        </label>
         <label>
           Tipo
           <Select
@@ -845,8 +842,19 @@ function ProductEditor({
             </Button>
           </fieldset>
         )}
+        <PurchasePresentationFields
+          values={value.purchasePresentations || []}
+          onChange={(values) => field("purchasePresentations", values)}
+        />
         <p role="alert">{error}</p>
-        <Button className="primary" disabled={busy || photoBusy}>
+        <Button
+          className="primary"
+          disabled={
+            busy ||
+            photoBusy ||
+            !purchaseNamesValid(value.purchasePresentations || [])
+          }
+        >
           Guardar producto
         </Button>
         <Button tone="secondary" type="button" onClick={close}>

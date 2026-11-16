@@ -149,6 +149,7 @@ test(
       );
       assert.equal(weightProduct.weightUnit, "lb");
       assert.equal(weightProduct.purchasePresentation, "arroba");
+      assert.deepEqual(weightProduct.purchasePresentations, ["arroba"]);
       assert.equal(weightProduct.stock, 1500);
       assert.equal(weightProduct.priceCop, 4000);
       assert.equal(weightProduct.minimum, 500);
@@ -160,6 +161,7 @@ test(
           name: weightProduct.name,
           kind: "weight",
           weightUnit: "kg",
+          purchasePresentations: ["arroba", "bulto"],
           priceCop: 4000,
           costCop: 2000,
           minimum: 500,
@@ -173,8 +175,39 @@ test(
         (x: any) => x.id === weighted.data.id,
       );
       assert.equal(weightProduct.weightUnit, "kg");
+      assert.deepEqual(weightProduct.purchasePresentations, [
+        "arroba",
+        "bulto",
+      ]);
       assert.equal(weightProduct.purchasePresentation, "arroba");
       assert.equal(weightProduct.stock, 1500);
+      const legacyPurchaseUpdate = await req(
+        "/inventory/" + weightProduct.id,
+        admin,
+        "PUT",
+        {
+          name: weightProduct.name,
+          kind: "weight",
+          weightUnit: "kg",
+          purchasePresentation: "media arroba",
+          priceCop: 4000,
+          costCop: 2000,
+          minimum: 500,
+          visible: true,
+          version: weightProduct.version,
+          presentations: [],
+        },
+      );
+      assert.equal(legacyPurchaseUpdate.status, 201);
+      weightProduct = (await req("/inventory", admin)).data.find(
+        (x: any) => x.id === weighted.data.id,
+      );
+      assert.deepEqual(weightProduct.purchasePresentations, [
+        "media arroba",
+        "bulto",
+      ]);
+      assert.equal(weightProduct.stock, 1500);
+      assert.equal(weightProduct.priceCop, 4000);
       const input = {
         name: "Producto prueba",
         kind: "unit",

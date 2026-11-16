@@ -48,6 +48,24 @@ test("Reposición: disponibilidad reservada, cantidades por medida y agrupación
   assert.match(text, /Huevos: 12 unidades/);
   assert.match(text, /Papa: 1,5 libras/);
   const packaged = { ...base, purchasePresentation: "tira de 24 unidades" };
+  const multiplePurchase = {
+    ...packaged,
+    purchasePresentations: ["tira de 24 unidades", "caja de 48 unidades"],
+  };
+  assert.deepEqual(
+    purchaseOptions(multiplePurchase).map((o) => o.id),
+    ["purchase", "purchase:caja de 48 unidades", "unit"],
+  );
+  assert.match(
+    replenishmentText([
+      {
+        product: multiplePurchase,
+        quantity: "2",
+        presentation: "purchase:caja de 48 unidades",
+      },
+    ]),
+    /2 × caja de 48 unidades/,
+  );
   const several = {
     ...packaged,
     presentations: [

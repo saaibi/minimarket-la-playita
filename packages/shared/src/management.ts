@@ -7,6 +7,16 @@ export const productWriteSchema = z
     code: z.string().trim().max(80).default(""),
     supplier: z.string().trim().max(150).default(""),
     purchasePresentation: z.string().trim().max(80).optional(),
+    purchasePresentations: z
+      .array(z.string().trim().min(1).max(80))
+      .max(20)
+      .refine(
+        (values) =>
+          new Set(values.map((v) => v.toLocaleLowerCase("es"))).size ===
+          values.length,
+        "Las presentaciones de compra deben ser diferentes",
+      )
+      .optional(),
     description: z.string().trim().max(1000).default(""),
     photo: z
       .union([

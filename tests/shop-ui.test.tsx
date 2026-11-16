@@ -4,6 +4,7 @@ import { JSDOM } from "jsdom";
 test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin credenciales demo", async () => {
   const dom = new JSDOM("<html><body></body></html>", {
     url: "http://127.0.0.1:5173/",
+    pretendToBeVisual: true,
   });
   Object.assign(globalThis, {
     window: dom.window,
@@ -11,6 +12,8 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
     HTMLElement: dom.window.HTMLElement,
     sessionStorage: dom.window.sessionStorage,
     IS_REACT_ACT_ENVIRONMENT: true,
+    requestAnimationFrame: dom.window.requestAnimationFrame.bind(dom.window),
+    cancelAnimationFrame: dom.window.cancelAnimationFrame.bind(dom.window),
   });
   Object.defineProperty(globalThis, "navigator", {
     value: dom.window.navigator,
@@ -167,6 +170,23 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
           view.getByRole("button", { name: "Acciones de inventario" }),
         );
         assert.ok(view.getByRole("button", { name: "Nuevo producto" }));
+        fireEvent.click(view.getByRole("button", { name: "Nuevo producto" }));
+        const productDialog = view.getByRole("dialog", {
+          name: "Nuevo producto",
+        });
+        const purchaseSection = within(productDialog).getByText(
+          "Presentaciones de compra",
+          { exact: true },
+        );
+        const salesSection = within(productDialog).getByText(
+          "Presentaciones y precios independientes",
+          { exact: true },
+        );
+        assert.ok(salesSection.compareDocumentPosition(purchaseSection) & 4);
+        fireEvent.click(
+          within(productDialog).getByRole("button", { name: "× Cerrar" }),
+        );
+
         fireEvent.click(view.getByRole("button", { name: "Ajustes" }));
         await waitFor(() =>
           assert.ok(view.getByRole("heading", { name: "Cuentas y roles" })),
