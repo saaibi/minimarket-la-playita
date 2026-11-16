@@ -46,7 +46,7 @@ test("Reposición: disponibilidad reservada, cantidades por medida y agrupación
   assert.match(text, /Proveedor: Proveedor B/);
   assert.match(text, /Huevos: 12 unidades/);
   assert.match(text, /Papa: 1,5 libras/);
-  assert.match(text, /Quedan: 3 libras/);
+  assert.equal(text.includes("Quedan"), false);
   assert.equal(text.includes("650"), false);
   assert.throws(
     () => replenishmentText([{ product: base, quantity: "" }]),

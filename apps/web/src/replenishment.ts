@@ -1,4 +1,4 @@
-import { stockLabel, type Product } from "@playita/shared";
+import { type Product } from "@playita/shared";
 export const supplierName = (p: Product) =>
   p.supplier?.trim() || "Sin proveedor";
 export const needsReplenishment = (p: Product) =>
@@ -41,7 +41,7 @@ export function replenishmentText(
     parts.push("", `Proveedor: ${supplier}`);
     for (const { product: p, quantity } of items)
       parts.push(
-        `• ${p.name}${p.code ? ` [${p.code}]` : ""}: ${Number(quantity).toLocaleString("es-CO", { maximumFractionDigits: 3 })} ${orderUnit(p)} · Quedan: ${stockLabel(p, p.available)}`,
+        `• ${p.name}${p.code ? ` [${p.code}]` : ""}: ${Number(quantity).toLocaleString("es-CO", { maximumFractionDigits: 3 })} ${orderUnit(p)}`,
       );
   }
   return parts.join("\n");
