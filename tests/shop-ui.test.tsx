@@ -16,6 +16,10 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
     value: dom.window.navigator,
     configurable: true,
   });
+  let scrollToTopCalls = 0;
+  dom.window.scrollTo = () => {
+    scrollToTopCalls++;
+  };
   const React = await import("react");
   const { MemoryRouter } = await import("react-router-dom");
   const { render, fireEvent, waitFor, cleanup, act, within } =
@@ -159,6 +163,9 @@ test("React real: navegación por rol, marca, canasta, pedidos y ajustes sin cre
         assert.ok(view.getByRole("heading", { name: "Clientes" }));
         assert.ok(view.getByRole("heading", { name: "Horario · Bogotá" }));
         fireEvent.click(view.getByRole("button", { name: "Inventario" }));
+        const beforeDoubleTap = scrollToTopCalls;
+        fireEvent.click(view.getByRole("button", { name: "Inventario" }));
+        assert.equal(scrollToTopCalls, beforeDoubleTap + 1);
         assert.ok(view.getByRole("columnheader", { name: "Costo" }));
         fireEvent.click(view.getByRole("button", { name: "Ajustar" }));
         assert.equal(
